@@ -17,7 +17,6 @@ async function main() {
   });
 
   console.log("Seeded user:", user.username, "(password: admin123)");
-  console.log("AUTH_SECRET_KEY =", process.env.AUTH_SECRET_KEY ?? "(unset)");
 }
 
 main()

@@ -35,8 +35,7 @@ The backend auto-runs `prisma generate` + `prisma migrate deploy` on every
 
 ## Seed (optional)
 
-Creates the sample login user (`admin` / `admin123`) and shows the
-`AUTH_SECRET_KEY` value:
+Creates the sample login user (`admin` / `admin123`):
 
 ```bash
 cd api && yarn db:seed
@@ -47,7 +46,6 @@ cd api && yarn db:seed
 - URL: http://localhost:3000/login
 - Username: `admin`
 - Password: `admin123`
-- Secret key: the value of `AUTH_SECRET_KEY` in `api/.env` (shown by the seed script)
 
 ## Env files
 

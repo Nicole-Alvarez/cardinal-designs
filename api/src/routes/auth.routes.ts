@@ -7,8 +7,8 @@ const router = Router();
 
 router.post("/login", async (req: Request, res: Response) => {
   try {
-    const { username, password, secretKey } = req.body ?? {};
-    const result = await login({ username, password, secretKey });
+    const { username, password } = req.body ?? {};
+    const result = await login({ username, password });
 
     res.cookie(config.cookieName, result.token, {
       httpOnly: true,

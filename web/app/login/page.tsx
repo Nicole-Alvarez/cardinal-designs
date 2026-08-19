@@ -19,7 +19,6 @@ function LoginForm() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [secretKey, setSecretKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +31,7 @@ function LoginForm() {
       await apiFetch("/api/auth/login", {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify({ username, password, secretKey }),
+        body: JSON.stringify({ username, password }),
       });
       router.replace(next);
       router.refresh();
@@ -48,7 +47,7 @@ function LoginForm() {
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Enter your credentials and secret key to continue.
+          Enter your credentials to continue.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
@@ -72,18 +71,6 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Secret key
-            <input
-              type="password"
-              value={secretKey}
-              onChange={(e) => setSecretKey(e.target.value)}
-              required
-              autoComplete="off"
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
             />
           </label>

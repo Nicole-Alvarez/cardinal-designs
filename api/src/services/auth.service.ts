@@ -6,7 +6,6 @@ import prisma from "../prisma";
 export interface LoginInput {
   username: string;
   password: string;
-  secretKey: string;
 }
 
 export class AuthError extends Error {
@@ -15,11 +14,7 @@ export class AuthError extends Error {
   }
 }
 
-export async function login({ username, password, secretKey }: LoginInput) {
-  if (secretKey !== config.authSecretKey) {
-    throw new AuthError("Invalid secret key");
-  }
-
+export async function login({ username, password }: LoginInput) {
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) {
     throw new AuthError("Invalid username or password");
