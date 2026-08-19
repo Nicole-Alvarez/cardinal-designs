@@ -9,7 +9,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login") {
     if (token) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return NextResponse.next();
   }
@@ -41,5 +41,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login"],
+  matcher: ["/dashboard/:path*", "/login"],
 };
