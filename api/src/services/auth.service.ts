@@ -1,0 +1,61 @@
+import argon2 from "argon2";
+import crypto from "crypto";
+import { config } from "../config";
+import prisma from "../prisma";
+
+export interface LoginInput {
+  username: string;
+  password: string;
+  secretKey: string;
+}
+
+export class AuthError extends Error {
+  constructor(message: string, public statusCode = 401) {
+    super(message);
+  }
+}
+
+export async function login({ username, password, secretKey }: LoginInput) {
+  if (secretKey !== config.authSecretKey) {
+    throw new AuthError("Invalid secret key");
+  }
+
+  const user = await prisma.user.findUnique({ where: { username } });
+  if (!user) {
+    throw new AuthError("Invalid username or password");
+  }
+
+  const valid = await argon2.verify(user.passwordHash, password);
+  if (!valid) {
+    throw new AuthError("Invalid username or password");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + config.sessionTtlMs);
+
+  await prisma.session.create({
+    data: { token, userId: user.id, expiresAt },
+  });
+
+  return {
+    token,
+    expiresAt,
+    user: { id: user.id, username: user.username, name: user.name },
+  };
+}
+
+export async function logout(token?: string) {
+  if (!token) return;
+  await prisma.session.deleteMany({ where: { token } });
+}
+
+export async function me(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true, name: true },
+  });
+  if (!user) {
+    throw new AuthError("User not found", 404);
+  }
+  return user;
+}
