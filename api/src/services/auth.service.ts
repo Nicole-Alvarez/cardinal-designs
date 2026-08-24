@@ -35,7 +35,7 @@ export async function login({ username, password }: LoginInput) {
   return {
     token,
     expiresAt,
-    user: { id: user.id, username: user.username, name: user.name },
+    user: { id: user.id, username: user.username, name: user.name, role: user.role },
   };
 }
 
@@ -47,7 +47,7 @@ export async function logout(token?: string) {
 export async function me(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, name: true },
+    select: { id: true, username: true, name: true, role: true },
   });
   if (!user) {
     throw new AuthError("User not found", 404);

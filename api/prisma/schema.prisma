@@ -15,6 +15,7 @@ model User {
   username     String    @unique
   passwordHash String
   name         String?
+  role         String    @default("member")
   sessions     Session[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -29,4 +30,16 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  title     String   @unique
+  content   Json?
+  html      String?
+  react     String?
+  angular   String?
+  isCode    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
