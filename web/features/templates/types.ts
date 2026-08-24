@@ -1,3 +1,5 @@
+import { DEFAULT_ICON_NAME } from "./icons";
+
 export interface TemplateSummary {
   id: string;
   title: string;
@@ -22,6 +24,7 @@ export type BlockType =
   | "text"
   | "button"
   | "image"
+  | "icon"
   | "divider"
   | "spacer";
 
@@ -36,6 +39,7 @@ export interface BlockStyle {
   padding: number;
   borderWidth: number; // 0 = none
   borderColor: string;
+  borderRadius: number; // 0 = none
 }
 
 /** Universal block: free-positioned rectangle on the canvas (Figma-like). */
@@ -46,11 +50,15 @@ export interface TemplateBlock {
   y: number;
   width: number;
   height: number;
+  /** Paint order; higher values render above lower ones. */
+  z: number;
   text?: string;
   level?: 1 | 2 | 3;
   href?: string;
   src?: string;
   alt?: string;
+  /** Lucide icon name (kebab-case); used by the "icon" variant. */
+  icon?: string;
   style: BlockStyle;
 }
 
@@ -118,6 +126,7 @@ export function defaultBlockStyle(): BlockStyle {
     padding: 8,
     borderWidth: 0,
     borderColor: "#d4d4d8",
+    borderRadius: 0,
   };
 }
 
@@ -151,6 +160,8 @@ function estimateFlowHeight(block: Record<string, unknown>, style: BlockStyle): 
       return pad + 1;
     case "image":
       return (Number(block.height) || 180) + pad;
+    case "icon":
+      return Number(block.height) || 48;
     case "button":
       return Math.round(style.fontSize * 1.5) + 20 + pad;
     case "heading":
@@ -165,6 +176,7 @@ const LEGACY_DEFAULT_WIDTH: Record<BlockType, number> = {
   text: 320,
   button: 160,
   image: 260,
+  icon: 48,
   divider: 320,
   spacer: 120,
 };
@@ -175,7 +187,7 @@ function migrateLegacyBlocks(raw: Record<string, unknown>[], canvasWidthPx: numb
   const GAP = 8;
   const maxW = Math.max(64, canvasWidthPx - MARGIN * 2);
   let y = MARGIN;
-  return raw.map((b) => {
+  return raw.map((b, index) => {
     const type = (b.type ?? "text") as BlockType;
     const style = normalizeStyle(b.style);
     const legacyW = parsePx((b.style as Record<string, unknown>)?.width);
@@ -189,6 +201,7 @@ function migrateLegacyBlocks(raw: Record<string, unknown>[], canvasWidthPx: numb
       y,
       width,
       height,
+      z: index,
       style,
     };
     if (typeof b.text === "string") migrated.text = b.text;
@@ -201,7 +214,7 @@ function migrateLegacyBlocks(raw: Record<string, unknown>[], canvasWidthPx: numb
   });
 }
 
-function normalizePositionedBlock(b: Record<string, unknown>): TemplateBlock {
+function normalizePositionedBlock(b: Record<string, unknown>, index: number): TemplateBlock {
   const type = (b.type ?? "text") as BlockType;
   const migrated: TemplateBlock = {
     id: typeof b.id === "string" ? b.id : crypto.randomUUID(),
@@ -210,13 +223,20 @@ function normalizePositionedBlock(b: Record<string, unknown>): TemplateBlock {
     y: Math.round(Number(b.y) || 0),
     width: Math.max(16, Math.round(Number(b.width) || LEGACY_DEFAULT_WIDTH[type])),
     height: Math.max(16, Math.round(Number(b.height) || 32)),
+    z:
+      typeof b.z === "number" && Number.isFinite(b.z)
+        ? Math.max(0, Math.round(b.z))
+        : index,
     style: normalizeStyle(b.style),
   };
   if (typeof b.text === "string") migrated.text = b.text;
   if (typeof b.href === "string") migrated.href = b.href;
   if (typeof b.src === "string") migrated.src = b.src;
   if (typeof b.alt === "string") migrated.alt = b.alt;
+  if (typeof b.icon === "string") migrated.icon = b.icon;
   if (b.level === 1 || b.level === 2 || b.level === 3) migrated.level = b.level;
+  // icon blocks are always square; heal saved content where they diverged
+  if (type === "icon") migrated.height = migrated.width;
   return migrated;
 }
 
@@ -240,15 +260,25 @@ export function parseContent(raw: unknown): TemplateContent {
     return {
       version: 2,
       canvas,
-      blocks: isV2 ? rawBlocks.map(normalizePositionedBlock) : migrateLegacyBlocks(rawBlocks, width),
+      blocks: isV2 ? rawBlocks.map((b, i) => normalizePositionedBlock(b, i)) : migrateLegacyBlocks(rawBlocks, width),
     };
   }
   return { version: 2, canvas: { ...DEFAULT_CANVAS }, blocks: [] };
 }
 
 /** Factory for the universal block; every new block starts as a Text variant. */
-export function createUniversalBlock(x = 0, y = 0, type: BlockType = "text"): TemplateBlock {
-  const base = { id: crypto.randomUUID(), x: Math.round(x), y: Math.round(y) };
+export function createUniversalBlock(
+  x = 0,
+  y = 0,
+  type: BlockType = "text",
+  z = 0
+): TemplateBlock {
+  const base = {
+    id: crypto.randomUUID(),
+    x: Math.round(x),
+    y: Math.round(y),
+    z: Math.max(0, Math.round(z)),
+  };
   switch (type) {
     case "heading":
       return {
@@ -274,14 +304,24 @@ export function createUniversalBlock(x = 0, y = 0, type: BlockType = "text"): Te
           backgroundColor: "#18181b",
           textAlign: "center",
           padding: 8,
+          borderRadius: 8,
         },
       };
     case "image":
-      return { ...base, type, width: 240, height: 180, src: "", alt: "", style: defaultBlockStyle() };
+      return { ...base, type, width: 240, height: 180, src: "", alt: "", style: { ...defaultBlockStyle(), borderRadius: 0 } };
     case "divider":
-      return { ...base, type, width: 220, height: 9, style: { ...defaultBlockStyle(), padding: 4 } };
+      return { ...base, type, width: 220, height: 9, style: { ...defaultBlockStyle(), borderRadius: 0, padding: 4 } };
     case "spacer":
       return { ...base, type, width: 140, height: 32, style: defaultBlockStyle() };
+    case "icon":
+      return {
+        ...base,
+        type,
+        width: 48,
+        height: 48,
+        icon: DEFAULT_ICON_NAME,
+        style: defaultBlockStyle(),
+      };
     case "text":
     default:
       return { ...base, type: "text", width: 280, height: 44, text: "Write something...", style: defaultBlockStyle() };

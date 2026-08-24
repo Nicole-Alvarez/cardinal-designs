@@ -1,12 +1,19 @@
 import type { TemplateBlock, TemplateCanvas } from "./types";
+import { htmlIconSvg, jsxIconSvg } from "./icons";
 
 const IND = "  ";
+
+/** Stable paint-order copy: lower z first (ties keep insertion order). */
+function byZ(blocks: TemplateBlock[]): TemplateBlock[] {
+  return [...blocks].sort((a, b) => a.z - b.z);
+}
 
 function esc(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/'/g, "&#39;")
     .replace(/"/g, "&quot;");
 }
 
@@ -26,7 +33,9 @@ function canvasRootCss(canvas: TemplateCanvas): string {
   parts.push(`background-color: ${canvas.backgroundColor}`);
   parts.push(`color: ${canvas.textColor}`);
   if (canvas.borderWidth > 0) {
-    parts.push(`border: ${canvas.borderWidth}px solid ${canvas.borderColor}`);
+    parts.push(
+      `border: ${canvas.borderWidth}px solid ${canvas.borderColor}`
+    );
   }
   return parts.join("; ");
 }
@@ -63,25 +72,31 @@ function blockFrameCss(block: TemplateBlock): string {
     `height: ${Math.round(block.height)}px`,
     "box-sizing: border-box",
     "overflow: hidden",
-    `padding: ${block.style.padding}px`,
-    `background-color: ${block.style.backgroundColor}`,
-    `text-align: ${block.style.textAlign}`,
+    `z-index: ${Math.max(0, Math.round(block.z))}`,
   ];
-  if (block.type === "divider") {
-    parts.push("display: flex", "align-items: center");
+  if (block.type !== "image" && block.type !== "icon") {
+    parts.push(`padding: ${block.style.padding}px`);
+  }
+  parts.push(`background-color: ${block.style.backgroundColor}`);
+  parts.push(`text-align: ${block.style.textAlign}`);
+  if (block.type === "icon" && block.style.color !== "inherit") {
+    parts.push(`color: ${block.style.color}`);
   }
   if (block.style.borderWidth > 0) {
-    parts.push(
-      `border: ${block.style.borderWidth}px solid ${block.style.borderColor}`,
-    );
+    parts.push(`border: ${block.style.borderWidth}px solid ${block.style.borderColor}`);
+  }
+  if (block.style.borderRadius > 0) {
+    parts.push(`border-radius: ${block.style.borderRadius}px`);
+  }
+  if (block.type === "divider") {
+    parts.push("display: flex", "align-items: center");
   }
   return parts.join("; ");
 }
 
 function blockInnerCss(block: TemplateBlock): string {
   const parts = ["margin: 0"];
-  if (block.style.color !== "inherit")
-    parts.push(`color: ${block.style.color}`);
+  if (block.style.color !== "inherit") parts.push(`color: ${block.style.color}`);
   parts.push(`font-size: ${block.style.fontSize}px`);
   parts.push(`font-weight: ${block.style.fontWeight}`);
   return parts.join("; ");
@@ -94,24 +109,20 @@ function blockLines(block: TemplateBlock, out: string[]): void {
     case "heading": {
       const tag = `h${block.level ?? 2}`;
       out.push(`${IND}${open}`);
-      out.push(
-        `${IND}${IND}<${tag} style="${blockInnerCss(block)}">${esc(block.text ?? "")}</${tag}>`,
-      );
+      out.push(`${IND}${IND}<${tag} style="${blockInnerCss(block)}">${esc(block.text ?? "")}</${tag}>`);
       out.push(`${IND}${close}`);
       break;
     }
     case "text": {
       out.push(`${IND}${open}`);
-      out.push(
-        `${IND}${IND}<p style="${blockInnerCss(block)}">${esc(block.text ?? "")}</p>`,
-      );
+      out.push(`${IND}${IND}<p style="${blockInnerCss(block)}">${esc(block.text ?? "")}</p>`);
       out.push(`${IND}${close}`);
       break;
     }
     case "button": {
       out.push(`${IND}${open}`);
       out.push(
-        `${IND}${IND}<a href="${esc(block.href ?? "#")}" style="display: inline-block; padding: 10px 20px; border-radius: 8px; text-decoration: none; ${blockInnerCss(block)}">${esc(block.text ?? "")}</a>`,
+        `${IND}${IND}<a href="${esc(block.href ?? "#")}" style="display: inline-block; padding: 10px 20px; border-radius: 8px; text-decoration: none; ${blockInnerCss(block)}">${esc(block.text ?? "")}</a>`
       );
       out.push(`${IND}${close}`);
       break;
@@ -119,15 +130,22 @@ function blockLines(block: TemplateBlock, out: string[]): void {
     case "image": {
       out.push(`${IND}${open}`);
       out.push(
-        `${IND}${IND}<img src="${esc(block.src || "")}" alt="${esc(block.alt || "")}" style="display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />`,
+        `${IND}${IND}<img src="${esc(block.src || "")}" alt="${esc(block.alt || "")}" style="display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />`
       );
+      out.push(`${IND}${close}`);
+      break;
+    }
+    case "icon": {
+      out.push(`${IND}${open}`);
+      const svg = htmlIconSvg(block.icon);
+      if (svg) out.push(`${IND}${IND}${svg}`);
       out.push(`${IND}${close}`);
       break;
     }
     case "divider": {
       out.push(`${IND}${open}`);
       out.push(
-        `${IND}${IND}<hr style="border: none; border-top: 1px solid currentColor; opacity: 0.2; width: 100%;" />`,
+        `${IND}${IND}<hr style="border: none; border-top: 1px solid currentColor; opacity: 0.2; width: 100%;" />`
       );
       out.push(`${IND}${close}`);
       break;
@@ -139,78 +157,16 @@ function blockLines(block: TemplateBlock, out: string[]): void {
   }
 }
 
-function reactBlockLines(
-  block: TemplateBlock,
-  out: string[],
-  depth: number,
-): void {
-  const pad = IND.repeat(depth);
-  const pad2 = IND.repeat(depth + 1);
-  const wrapper = reactStyleEntries(blockFrameCss(block));
-  switch (block.type) {
-    case "heading": {
-      const tag = `h${block.level ?? 2}`;
-      out.push(`${pad}<div style={{ ${wrapper} }}>`);
-      out.push(
-        `${pad2}<${tag} style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</${tag}>`,
-      );
-      out.push(`${pad}</div>`);
-      break;
-    }
-    case "text": {
-      out.push(`${pad}<div style={{ ${wrapper} }}>`);
-      out.push(
-        `${pad2}<p style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</p>`,
-      );
-      out.push(`${pad}</div>`);
-      break;
-    }
-    case "button": {
-      out.push(`${pad}<div style={{ ${wrapper} }}>`);
-      out.push(
-        `${pad2}<a href="${esc(block.href ?? "#")}" style={{ display: "inline-block", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</a>`,
-      );
-      out.push(`${pad}</div>`);
-      break;
-    }
-    case "image": {
-      out.push(`${pad}<div style={{ ${wrapper} }}>`);
-      out.push(
-        `${pad2}<img src="${esc(block.src || "")}" alt="${esc(block.alt || "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />`,
-      );
-      out.push(`${pad}</div>`);
-      break;
-    }
-    case "divider": {
-      out.push(`${pad}<div style={{ ${wrapper} }}>`);
-      out.push(
-        `${pad2}<hr style={{ border: "none", borderTop: "1px solid currentColor", opacity: 0.2, width: "100%" }} />`,
-      );
-      out.push(`${pad}</div>`);
-      break;
-    }
-    case "spacer": {
-      out.push(`${pad}<div style={{ ${wrapper} }} />`);
-      break;
-    }
-  }
-}
-
-export function blocksToHtml(
-  blocks: TemplateBlock[],
-  canvas: TemplateCanvas,
-): string {
+export function blocksToHtml(blocks: TemplateBlock[], canvas: TemplateCanvas): string {
   const out: string[] = [`<div style="${canvasRootCss(canvas)}">`];
 
   const overlay = overlayCss(canvas);
   if (overlay) {
-    out.push(
-      `${IND}<img src="${esc(canvas.overlayImage)}" alt="" style="${overlay}" />`,
-    );
+    out.push(`${IND}<img src="${esc(canvas.overlayImage)}" alt="" style="${overlay}" />`);
   }
 
   out.push(`${IND}<div style="${contentWrapperCss(canvas)}">`);
-  for (const block of blocks) blockLines(block, out);
+  for (const block of byZ(blocks)) blockLines(block, out);
   out.push(`${IND}</div>`);
 
   out.push("</div>");
@@ -239,10 +195,70 @@ function pascalIdentifier(title: string): string {
   return /^[0-9]/.test(ident) ? `T${ident}` : ident;
 }
 
+function reactBlockLines(block: TemplateBlock, out: string[], depth: number): void {
+  const pad = IND.repeat(depth);
+  const pad2 = IND.repeat(depth + 1);
+  const wrapper = reactStyleEntries(blockFrameCss(block));
+  switch (block.type) {
+    case "heading": {
+      const tag = `h${block.level ?? 2}`;
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      out.push(
+        `${pad2}<${tag} style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</${tag}>`
+      );
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "text": {
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      out.push(
+        `${pad2}<p style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</p>`
+      );
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "button": {
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      out.push(
+        `${pad2}<a href="${esc(block.href ?? "#")}" style={{ display: "inline-block", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</a>`
+      );
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "image": {
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      out.push(
+        `${pad2}<img src="${esc(block.src || "")}" alt="${esc(block.alt || "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />`
+      );
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "icon": {
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      const svg = jsxIconSvg(block.icon);
+      if (svg) out.push(`${pad2}${svg}`);
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "divider": {
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      out.push(
+        `${pad2}<hr style={{ border: "none", borderTop: "1px solid currentColor", opacity: 0.2, width: "100%" }} />`
+      );
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "spacer": {
+      out.push(`${pad}<div style={{ ${wrapper} }} />`);
+      break;
+    }
+  }
+}
+
 export function blocksToReact(
   blocks: TemplateBlock[],
   title: string,
-  canvas: TemplateCanvas,
+  canvas: TemplateCanvas
 ): string {
   const name = pascalIdentifier(title);
   const out: string[] = [
@@ -254,14 +270,14 @@ export function blocksToReact(
   const overlay = overlayCss(canvas);
   if (overlay) {
     out.push(
-      `${IND}${IND}${IND}<img src="${esc(canvas.overlayImage)}" alt="" style={{ ${reactStyleEntries(overlay)} }} />`,
+      `${IND}${IND}${IND}<img src="${esc(canvas.overlayImage)}" alt="" style={{ ${reactStyleEntries(overlay)} }} />`
     );
   }
 
-  out.push(
-    `${IND}${IND}${IND}<div style={{ ${reactStyleEntries(contentWrapperCss(canvas))} }}>`,
-  );
-  for (const block of blocks) reactBlockLines(block, out, 5);
+  out.push(`${IND}${IND}${IND}<div style={{ ${reactStyleEntries(contentWrapperCss(canvas))} }}>`);
+
+  for (const block of byZ(blocks)) reactBlockLines(block, out, 5);
+
   out.push(`${IND}${IND}${IND}</div>`);
   out.push(`${IND}${IND}</div>`);
   out.push(`${IND});`);
@@ -272,7 +288,7 @@ export function blocksToReact(
 export function blocksToAngular(
   blocks: TemplateBlock[],
   title: string,
-  canvas: TemplateCanvas,
+  canvas: TemplateCanvas
 ): string {
   const name = pascalIdentifier(title);
   const selector = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -280,12 +296,10 @@ export function blocksToAngular(
   const body: string[] = [`${IND}${IND}<div style="${canvasRootCss(canvas)}">`];
   const overlay = overlayCss(canvas);
   if (overlay) {
-    body.push(
-      `${IND}${IND}${IND}<img src="${esc(canvas.overlayImage)}" alt="" style="${overlay}" />`,
-    );
+    body.push(`${IND}${IND}${IND}<img src="${esc(canvas.overlayImage)}" alt="" style="${overlay}" />`);
   }
   body.push(`${IND}${IND}${IND}<div style="${contentWrapperCss(canvas)}">`);
-  for (const block of blocks) blockLines(block, body);
+  for (const block of byZ(blocks)) blockLines(block, body);
   body.push(`${IND}${IND}${IND}</div>`);
   body.push(`${IND}${IND}</div>`);
 

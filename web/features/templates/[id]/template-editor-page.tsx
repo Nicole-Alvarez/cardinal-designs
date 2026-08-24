@@ -93,7 +93,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     const size = workingCanvasSize(canvas);
     const block = createUniversalBlock(
       (size.width - 280) / 2,
-      (size.height - 44) / 2
+      (size.height - 44) / 2,
+      "text",
+      nextZ()
     );
     setBlocks((prev) => [...prev, block]);
     setSelectedId(block.id);
@@ -102,7 +104,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function addBlockAt(x: number, y: number) {
-    const block = createUniversalBlock(x, y);
+    const block = createUniversalBlock(x, y, "text", nextZ());
     setBlocks((prev) => [...prev, block]);
     setSelectedId(block.id);
     setPanelTab("block");
@@ -149,6 +151,27 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function patchCanvas(patch: Partial<TemplateCanvas>) {
     setCanvas((prev) => ({ ...prev, ...patch }));
+    markDirty();
+  }
+
+  function nextZ() {
+    return blocks.reduce((max, b) => Math.max(max, b.z), -1) + 1;
+  }
+
+  function handleDelete(id: string) {
+    setBlocks((prev) => prev.filter((b) => b.id !== id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+    markDirty();
+  }
+
+  function stackBlock(id: string, dir: "front" | "back") {
+    setBlocks((prev) => {
+      if (!prev.some((b) => b.id === id)) return prev;
+      const maxZ = prev.reduce((m, b) => Math.max(m, b.z), -1);
+      const minZ = prev.reduce((m, b) => Math.min(m, b.z), Number.POSITIVE_INFINITY);
+      const z = dir === "front" ? maxZ + 1 : Math.max(0, minZ - 1);
+      return prev.map((b) => (b.id === id ? { ...b, z } : b));
+    });
     markDirty();
   }
 
@@ -318,6 +341,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 onMove={handleMove}
                 onResize={handleResize}
                 onAddAt={addBlockAt}
+                onDelete={handleDelete}
               />
             </section>
 
@@ -347,6 +371,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                   block={selectedBlock}
                   onChange={patchSelected}
                   onStyleChange={patchSelectedStyle}
+                  onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
                 />
               )}
             </aside>

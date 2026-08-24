@@ -2,26 +2,32 @@
 
 import type { BlockStyle, BlockType, TemplateBlock } from "@/features/templates/types";
 import { ColorInput, Field } from "./inspector-controls";
+import IconPicker from "./icon-picker";
 
 const VARIANTS: { type: BlockType; label: string }[] = [
   { type: "text", label: "Text" },
   { type: "heading", label: "Heading" },
   { type: "button", label: "Button" },
   { type: "image", label: "Image" },
+  { type: "icon", label: "Icon" },
   { type: "divider", label: "Divider" },
   { type: "spacer", label: "Spacer" },
 ];
+
+const FONT_WEIGHTS = [300, 400, 500, 600, 700];
 
 interface BlockInspectorProps {
   block: TemplateBlock | null;
   onChange: (patch: Partial<TemplateBlock>) => void;
   onStyleChange: (patch: Partial<BlockStyle>) => void;
+  onStack: (dir: "front" | "back") => void;
 }
 
 export default function BlockInspector({
   block,
   onChange,
   onStyleChange,
+  onStack,
 }: BlockInspectorProps) {
   if (!block) {
     return (
@@ -38,41 +44,84 @@ export default function BlockInspector({
       </p>
 
       <Field label="Variant">
-        <div className="grid grid-cols-3 gap-1">
+        <select
+          value={block.type}
+          onChange={(e) => {
+            const type = e.target.value as BlockType;
+            // icon blocks are square; adopt the current width as the size
+            if (type === "icon" && block.width !== block.height) {
+              onChange({ type, height: block.width });
+            } else {
+              onChange({ type });
+            }
+          }}
+          className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+        >
           {VARIANTS.map((variant) => (
-            <button
-              key={variant.type}
-              type="button"
-              onClick={() => onChange({ type: variant.type })}
-              className={
-                "rounded-lg border px-1 py-1.5 text-xs transition-colors " +
-                (block.type === variant.type
-                  ? "border-zinc-900 font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-50"
-                  : "border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800")
-              }
-            >
+            <option key={variant.type} value={variant.type}>
               {variant.label}
-            </button>
+            </option>
           ))}
+        </select>
+      </Field>
+
+      {block.type === "icon" && (
+        <IconPicker value={block.icon} onChange={(icon) => onChange({ icon })} />
+      )}
+
+      <Field label="Position & size">
+        <div className={block.type === "icon" ? "grid grid-cols-3 gap-1" : "grid grid-cols-4 gap-1"}>
+          <GeometryInput label="X" value={block.x} onChange={(x) => onChange({ x })} />
+          <GeometryInput label="Y" value={block.y} onChange={(y) => onChange({ y })} />
+          {block.type === "icon" ? (
+            <GeometryInput
+              label="Size"
+              value={block.width}
+              min={16}
+              onChange={(size) => onChange({ width: size, height: size })}
+            />
+          ) : (
+            <>
+              <GeometryInput
+                label="W"
+                value={block.width}
+                min={16}
+                onChange={(width) => onChange({ width })}
+              />
+              <GeometryInput
+                label="H"
+                value={block.height}
+                min={16}
+                onChange={(height) => onChange({ height })}
+              />
+            </>
+          )}
         </div>
       </Field>
 
-      <Field label="Position & size">
-        <div className="grid grid-cols-4 gap-1">
-          <GeometryInput label="X" value={block.x} onChange={(x) => onChange({ x })} />
-          <GeometryInput label="Y" value={block.y} onChange={(y) => onChange({ y })} />
-          <GeometryInput
-            label="W"
-            value={block.width}
-            min={16}
-            onChange={(width) => onChange({ width })}
-          />
-          <GeometryInput
-            label="H"
-            value={block.height}
-            min={16}
-            onChange={(height) => onChange({ height })}
-          />
+      <Field label="Stacking">
+        <div className="flex items-end gap-1">
+          <div className="w-16">
+            <GeometryInput
+              label="Z-index"
+              value={block.z}
+              onChange={(z) => onChange({ z: Math.max(0, Math.round(z)) })}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onStack("front")}
+            className="flex-1 rounded-lg border border-zinc-200 px-2 py-2 text-xs text-zinc-500 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Front
+          </button>
+          <button
+            type="button"
+            onClick={() => onStack("back")}
+            className="flex-1 rounded-lg border border-zinc-200 px-2 py-2 text-xs text-zinc-500 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Back
+          </button>
         </div>
       </Field>
 
@@ -166,17 +215,43 @@ export default function BlockInspector({
                 </div>
               </Field>
               <Field label="Font weight">
-                <select
-                  value={block.style.fontWeight}
-                  onChange={(e) => onStyleChange({ fontWeight: Number(e.target.value) })}
-                  className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
-                >
-                  {[300, 400, 500, 600, 700].map((w) => (
-                    <option key={w} value={w}>
-                      {w}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={block.style.fontWeight}
+                    onChange={(e) => onStyleChange({ fontWeight: Number(e.target.value) })}
+                    className="flex-1 rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+                  >
+                    {!FONT_WEIGHTS.includes(block.style.fontWeight) && (
+                      <option value={block.style.fontWeight}>
+                        {block.style.fontWeight} (custom)
+                      </option>
+                    )}
+                    {FONT_WEIGHTS.map((w) => (
+                      <option key={w} value={w}>
+                        {w}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={100}
+                    max={900}
+                    value={block.style.fontWeight}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isFinite(n)) onStyleChange({ fontWeight: n });
+                    }}
+                    onBlur={(e) => {
+                      const n = Number(e.target.value);
+                      if (!Number.isFinite(n)) return;
+                      const clamped = Math.min(900, Math.max(100, Math.round(n)));
+                      if (clamped !== block.style.fontWeight) {
+                        onStyleChange({ fontWeight: clamped });
+                      }
+                    }}
+                    className="w-16 rounded-lg border border-zinc-300 bg-transparent px-1 py-1.5 text-center text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+                  />
+                </div>
               </Field>
             </>
           )}
@@ -186,21 +261,23 @@ export default function BlockInspector({
               onChange={(backgroundColor) => onStyleChange({ backgroundColor })}
             />
           </Field>
-          <Field label="Padding">
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min={0}
-                max={48}
-                value={block.style.padding}
-                onChange={(e) => onStyleChange({ padding: Number(e.target.value) })}
-                className="flex-1 accent-zinc-900 dark:accent-zinc-100"
-              />
-              <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                {block.style.padding}px
-              </span>
-            </div>
-          </Field>
+          {block.type !== "image" && (
+            <Field label="Padding">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={0}
+                  max={48}
+                  value={block.style.padding}
+                  onChange={(e) => onStyleChange({ padding: Number(e.target.value) })}
+                  className="flex-1 accent-zinc-900 dark:accent-zinc-100"
+                />
+                <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                  {block.style.padding}px
+                </span>
+              </div>
+            </Field>
+          )}
           <Field label="Border width">
             <div className="flex items-center gap-2">
               <input
@@ -224,6 +301,21 @@ export default function BlockInspector({
               />
             </Field>
           )}
+          <Field label="Corner radius">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={48}
+                value={block.style.borderRadius}
+                onChange={(e) => onStyleChange({ borderRadius: Number(e.target.value) })}
+                className="w-full rounded-md border border-zinc-300 bg-transparent px-1 py-1 text-center text-xs focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+              />
+              <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                {block.style.borderRadius}px
+              </span>
+            </div>
+          </Field>
           <Field label="Align">
             <div className="grid grid-cols-3 gap-1">
               {(["left", "center", "right"] as const).map((align) => (

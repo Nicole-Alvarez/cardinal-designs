@@ -11,6 +11,7 @@ import CanvasStage from "./canvas-stage";
 
 const MIN_SIZE = 16;
 const PANE_PADDING = 32;
+const SNAP_THRESHOLD = 6;
 
 type ResizeDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -25,6 +26,7 @@ interface EditorCanvasProps {
     patch: { x?: number; y?: number; width: number; height: number }
   ) => void;
   onAddAt: (x: number, y: number) => void;
+  onDelete: (id: string) => void;
 }
 
 export default function EditorCanvas({
@@ -35,11 +37,16 @@ export default function EditorCanvas({
   onMove,
   onResize,
   onAddAt,
+  onDelete,
 }: EditorCanvasProps) {
   const paneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [interacting, setInteracting] = useState<string | null>(null);
+  const [guides, setGuides] = useState<{ xs: number[]; ys: number[] }>({
+    xs: [],
+    ys: [],
+  });
 
   const size = workingCanvasSize(canvas);
   const editorCanvas: TemplateCanvas = {
@@ -76,6 +83,52 @@ export default function EditorCanvas({
     onAddAt(point.x, point.y);
   }
 
+  function handleInteract(id: string | null) {
+    setInteracting(id);
+    if (id === null) setGuides({ xs: [], ys: [] });
+  }
+
+  function snapMove(
+    id: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): { x: number; y: number } {
+    const eps = SNAP_THRESHOLD / scale;
+    const candX: number[] = [0, size.width / 2, size.width];
+    const candY: number[] = [0, size.height / 2, size.height];
+    for (const o of blocks) {
+      if (o.id === id) continue;
+      candX.push(o.x, o.x + o.width / 2, o.x + o.width);
+      candY.push(o.y, o.y + o.height / 2, o.y + o.height);
+    }
+    const mineX = [x, x + width / 2, x + width];
+    const mineY = [y, y + height / 2, y + height];
+
+    let bx: { delta: number; at: number } | null = null;
+    let by: { delta: number; at: number } | null = null;
+
+    for (const c of candX) for (const m of mineX) {
+      const d = c - m;
+      if (Math.abs(d) <= eps && (!bx || Math.abs(d) < Math.abs(bx.delta))) {
+        bx = { delta: d, at: c };
+      }
+    }
+    for (const c of candY) for (const m of mineY) {
+      const d = c - m;
+      if (Math.abs(d) <= eps && (!by || Math.abs(d) < Math.abs(by.delta))) {
+        by = { delta: d, at: c };
+      }
+    }
+
+    setGuides({
+      xs: bx ? [bx.at] : [],
+      ys: by ? [by.at] : [],
+    });
+    return { x: x + (bx?.delta ?? 0), y: y + (by?.delta ?? 0) };
+  }
+
   return (
     <div
       ref={paneRef}
@@ -98,17 +151,49 @@ export default function EditorCanvas({
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
             >
-              {blocks.map((block) => (
-                <BlockFrame
-                  key={block.id}
-                  block={block}
-                  selected={block.id === selectedId}
-                  scale={scale}
-                  interacting={interacting === block.id}
-                  onSelect={() => onSelect(block.id)}
-                  onMove={onMove}
-                  onResize={onResize}
-                  onInteract={setInteracting}
+              {[...blocks]
+                .sort((a, b) => a.z - b.z)
+                .map((block) => (
+                  <BlockFrame
+                    key={block.id}
+                    block={block}
+                    selected={block.id === selectedId}
+                    scale={scale}
+                    interacting={interacting === block.id}
+                    onSelect={() => onSelect(block.id)}
+                    onMove={onMove}
+                    onResize={onResize}
+                    onInteract={handleInteract}
+                    onDelete={() => onDelete(block.id)}
+                    snap={(x, y, width, height) =>
+                      snapMove(block.id, x, y, width, height)
+                    }
+                  />
+                ))}
+              {guides.xs.map((v) => (
+                <span
+                  key={`vx${v}`}
+                  className="pointer-events-none absolute z-10"
+                  style={{
+                    left: v,
+                    top: 0,
+                    width: 0,
+                    height: "100%",
+                    borderLeft: "1px dashed #3b82f6",
+                  }}
+                />
+              ))}
+              {guides.ys.map((h) => (
+                <span
+                  key={`hy${h}`}
+                  className="pointer-events-none absolute z-10"
+                  style={{
+                    top: h,
+                    left: 0,
+                    height: 0,
+                    width: "100%",
+                    borderTop: "1px dashed #3b82f6",
+                  }}
                 />
               ))}
             </div>
@@ -128,6 +213,8 @@ function BlockFrame({
   onMove,
   onResize,
   onInteract,
+  onDelete,
+  snap,
 }: {
   block: TemplateBlock;
   selected: boolean;
@@ -140,8 +227,14 @@ function BlockFrame({
     patch: { x?: number; y?: number; width: number; height: number }
   ) => void;
   onInteract: (id: string | null) => void;
+  onDelete: () => void;
+  snap?: (
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => { x: number; y: number };
 }) {
-  const frameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -150,6 +243,7 @@ function BlockFrame({
     dir: ResizeDir | "move";
     gestureScale: number;
   } | null>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   function beginGesture(
     e: React.PointerEvent,
@@ -159,9 +253,11 @@ function BlockFrame({
     e.stopPropagation();
     onSelect();
     target.setPointerCapture(e.pointerId);
-    // frame rect reflects the stage transform; derive this gesture's scale
     const rect = frameRef.current?.getBoundingClientRect();
-    const gestureScale = rect ? rect.width / Math.max(1, block.width) : scale;
+    const gestureScale =
+      rect && rect.width > 0
+        ? rect.width / Math.max(1, block.width)
+        : scale || 1;
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -181,7 +277,11 @@ function BlockFrame({
     const { orig, dir } = drag;
 
     if (dir === "move") {
-      onMove(block.id, Math.round(orig.x + dx), Math.round(orig.y + dy));
+      const raw = { x: Math.round(orig.x + dx), y: Math.round(orig.y + dy) };
+      const snapped = snap
+        ? snap(raw.x, raw.y, block.width, block.height)
+        : raw;
+      onMove(block.id, snapped.x, snapped.y);
       return;
     }
     let x = orig.x;
@@ -190,14 +290,16 @@ function BlockFrame({
     let height = orig.height;
     if (dir.includes("e")) width = Math.max(MIN_SIZE, Math.round(orig.width + dx));
     if (dir.includes("s")) height = Math.max(MIN_SIZE, Math.round(orig.height + dy));
-    if (dir.includes("w")) {
-      width = Math.max(MIN_SIZE, Math.round(orig.width - dx));
-      x = Math.round(orig.x + (orig.width - width));
+    if (dir.includes("w")) width = Math.max(MIN_SIZE, Math.round(orig.width - dx));
+    if (dir.includes("n")) height = Math.max(MIN_SIZE, Math.round(orig.height - dy));
+    // icon blocks are always square: the dominant axis wins
+    if (block.type === "icon") {
+      const size = Math.max(width, height);
+      width = size;
+      height = size;
     }
-    if (dir.includes("n")) {
-      height = Math.max(MIN_SIZE, Math.round(orig.height - dy));
-      y = Math.round(orig.y + (orig.height - height));
-    }
+    if (dir.includes("w")) x = Math.round(orig.x + (orig.width - width));
+    if (dir.includes("n")) y = Math.round(orig.y + (orig.height - height));
     onResize(block.id, { x, y, width, height });
   }
 
@@ -207,7 +309,7 @@ function BlockFrame({
     onInteract(null);
   }
 
-  const inv = 1 / scale; // keeps handles/badges a constant visual size
+  const inv = 1 / scale;
 
   return (
     <div
@@ -218,8 +320,10 @@ function BlockFrame({
         top: block.y,
         width: block.width,
         height: block.height,
+        zIndex: block.z,
         cursor: "move",
         touchAction: "none",
+        userSelect: "none",
         outline: selected ? `${1.5 * inv}px solid #3b82f6` : undefined,
         outlineOffset: 0,
       }}
@@ -227,6 +331,7 @@ function BlockFrame({
       onPointerMove={onPointerMove}
       onPointerUp={endGesture}
       onPointerCancel={endGesture}
+      onDragStart={(e) => e.preventDefault()}
     >
       <BlockPreview block={block} />
 
@@ -243,6 +348,28 @@ function BlockFrame({
               onPointerCancel={endGesture}
             />
           ))}
+          <button
+            type="button"
+            aria-label="Delete block"
+            title="Delete block"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute grid cursor-pointer place-items-center rounded-full bg-zinc-900 font-medium leading-none text-white transition-colors hover:bg-red-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-red-500"
+            style={{
+              top: -8 * inv,
+              right: -8 * inv,
+              width: 16 * inv,
+              height: 16 * inv,
+              fontSize: 10 * inv,
+              border: `${1 * inv}px solid #ffffff`,
+              zIndex: 11,
+            }}
+          >
+            ×
+          </button>
           {interacting && (
             <span
               className="pointer-events-none absolute whitespace-nowrap rounded bg-blue-500 px-1 font-mono text-white"

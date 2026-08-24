@@ -1,4 +1,5 @@
 import type { BlockStyle, TemplateBlock } from "@/features/templates/types";
+import { getIconSvg } from "@/features/templates/icons";
 
 function wrapperStyle(style: BlockStyle): React.CSSProperties {
   return {
@@ -12,6 +13,7 @@ function wrapperStyle(style: BlockStyle): React.CSSProperties {
     borderWidth: style.borderWidth > 0 ? style.borderWidth : undefined,
     borderStyle: style.borderWidth > 0 ? "solid" : undefined,
     borderColor: style.borderWidth > 0 ? style.borderColor : undefined,
+    borderRadius: style.borderRadius,
   };
 }
 
@@ -24,30 +26,20 @@ const DIVIDER_STYLE: React.CSSProperties = {
   alignItems: "center",
 };
 
-function innerStyle(block: TemplateBlock): React.CSSProperties {
-  return {
-    margin: 0,
-    width: "100%",
-    color: block.style.color === "inherit" ? undefined : block.style.color,
-    fontSize: block.style.fontSize,
-    fontWeight: block.style.fontWeight,
-  };
-}
-
 export default function BlockPreview({ block }: { block: TemplateBlock }) {
   switch (block.type) {
     case "heading": {
       const Tag = (`h${block.level ?? 2}` as unknown) as "h2";
       return (
         <div style={wrapperStyle(block.style)}>
-          <Tag style={innerStyle(block)}>{block.text}</Tag>
+          <Tag style={{ margin: 0, color: block.style.color === "inherit" ? undefined : block.style.color, fontSize: block.style.fontSize, fontWeight: block.style.fontWeight }}>{block.text}</Tag>
         </div>
       );
     }
     case "text":
       return (
         <div style={wrapperStyle(block.style)}>
-          <p style={innerStyle(block)}>{block.text}</p>
+          <p style={{ margin: 0, ...(block.style.color !== "inherit" ? { color: block.style.color } : {}), fontSize: block.style.fontSize, fontWeight: block.style.fontWeight }}>{block.text}</p>
         </div>
       );
     case "button":
@@ -62,7 +54,6 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
               borderRadius: 8,
               textDecoration: "none",
               whiteSpace: "nowrap",
-              ...innerStyle(block),
             }}
           >
             {block.text}
@@ -71,7 +62,7 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
       );
     case "image":
       return (
-        <div style={wrapperStyle(block.style)}>
+        <div style={{ ...wrapperStyle(block.style), padding: 0 }}>
           {block.src ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -81,7 +72,7 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                borderRadius: 8,
+                borderRadius: 0,
                 margin: 0,
                 display: "block",
               }}
@@ -93,6 +84,37 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
           )}
         </div>
       );
+    case "icon": {
+      const inner = getIconSvg(block.icon);
+      return (
+        <div
+          style={{
+            ...wrapperStyle(block.style),
+            padding: 0,
+            color: block.style.color === "inherit" ? undefined : block.style.color,
+          }}
+        >
+          {inner ? (
+            <svg
+              viewBox="0 0 24 24"
+              width="100%"
+              height="100%"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}
+              dangerouslySetInnerHTML={{ __html: inner }}
+            />
+          ) : (
+            <div className="flex h-full min-h-16 w-full items-center justify-center rounded-lg border border-dashed border-zinc-300 text-xs text-zinc-400 dark:border-zinc-700">
+              No icon selected
+            </div>
+          )}
+        </div>
+      );
+    }
     case "divider":
       return (
         <div style={DIVIDER_STYLE}>
