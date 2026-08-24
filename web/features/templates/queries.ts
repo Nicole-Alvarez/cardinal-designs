@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUpload, apiUrl } from "@/lib/api";
 import type { Template, TemplateSummary } from "./types";
 
 export async function listTemplates(): Promise<TemplateSummary[]> {
@@ -47,4 +47,11 @@ export async function deleteTemplate(id: string): Promise<void> {
     method: "DELETE",
     credentials: "include",
   });
+}
+
+/** Uploads an image and returns its authenticated serving URL. */
+export async function uploadBlockImage(file: File): Promise<string> {
+  const data = await apiUpload<{ pathname: string }>("/api/uploads", file);
+  // raw slashes are valid in a query string; keeps the URL readable
+  return `${apiUrl("/api/uploads/blob")}?pathname=${data.pathname}`;
 }

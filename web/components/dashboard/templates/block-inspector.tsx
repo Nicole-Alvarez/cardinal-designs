@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { BlockStyle, BlockType, TemplateBlock } from "@/features/templates/types";
+import { uploadBlockImage } from "@/features/templates/queries";
 import { ColorInput, Field } from "./inspector-controls";
 import IconPicker from "./icon-picker";
 
@@ -29,6 +31,26 @@ export default function BlockInspector({
   onStyleChange,
   onStack,
 }: BlockInspectorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleUploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const url = await uploadBlockImage(file);
+      onChange({ src: url });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   if (!block) {
     return (
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -171,12 +193,34 @@ export default function BlockInspector({
       {block.type === "image" && (
         <>
           <Field label="Image URL">
-            <input
-              value={block.src ?? ""}
-              onChange={(e) => onChange({ src: e.target.value })}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
-            />
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <input
+                  value={block.src ?? ""}
+                  onChange={(e) => onChange({ src: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+                />
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="shrink-0 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  {uploading ? "Uploading…" : "Upload"}
+                </button>
+              </div>
+              {uploadError && (
+                <p className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleUploadFile}
+              />
+            </div>
           </Field>
           <Field label="Alt text">
             <input

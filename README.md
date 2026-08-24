@@ -49,7 +49,7 @@ cd api && yarn db:seed
 
 ## Env files
 
-- `api/.env` — `DATABASE_URL`, `AUTH_SECRET_KEY`, `PORT`, `FRONTEND_URL`
+- `api/.env` — `DATABASE_URL`, `AUTH_SECRET_KEY`, `PORT`, `FRONTEND_URL`, `BLOB_READ_WRITE_TOKEN` (Vercel Blob private uploads; create a store at vercel.com to get a token)
 - `web/.env.local` — `NEXT_PUBLIC_API_URL`
 
 ## Scripts
