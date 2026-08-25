@@ -172,6 +172,22 @@ export default function CanvasPanel({
           />
         </Field>
       )}
+
+      <Field label="Corner radius">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={48}
+            value={canvas.borderRadius}
+            onChange={(e) => onChange({ borderRadius: Number(e.target.value) })}
+            className="flex-1 accent-zinc-900 dark:accent-zinc-100"
+          />
+          <span className="w-10 text-right text-xs text-zinc-500 dark:text-zinc-400">
+            {canvas.borderRadius}px
+          </span>
+        </div>
+      </Field>
     </div>
   );
 }

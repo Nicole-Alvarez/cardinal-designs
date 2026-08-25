@@ -32,7 +32,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [title, setTitle] = useState("");
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
   const [lang, setLang] = useState<CodeLang>("html");
   const [codeBuffers, setCodeBuffers] = useState<
@@ -112,6 +112,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     };
   }, [templateId]);
 
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
 
   const generated = useMemo(() => {
@@ -136,7 +137,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       nextZ()
     );
     setBlocks((prev) => [...prev, block]);
-    setSelectedId(block.id);
+    setSelectedIds([block.id]);
     setPanelTab("block");
     markDirty();
   }
@@ -145,14 +146,28 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     checkpoint("add");
     const block = createUniversalBlock(x, y, "text", nextZ());
     setBlocks((prev) => [...prev, block]);
-    setSelectedId(block.id);
+    setSelectedIds([block.id]);
     setPanelTab("block");
     markDirty();
   }
 
-  function handleSelect(id: string | null) {
-    setSelectedId((prev) => (prev === id ? prev : id));
-    if (id !== null) setPanelTab("block");
+  function handleSelect(id: string | null, additive = false) {
+    if (id === null) {
+      setSelectedIds([]);
+      setPanelTab("canvas");
+      return;
+    }
+
+    setSelectedIds((prev) => {
+      if (!additive) return [id];
+      return prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id];
+    });
+    setPanelTab("block");
+  }
+
+  function handleSelectAll() {
+    setSelectedIds((prev) => (prev.length === blocks.length ? [] : blocks.map((block) => block.id)));
+    setPanelTab(blocks.length === 1 ? "block" : "canvas");
   }
 
   function handleMove(id: string, x: number, y: number) {
@@ -205,7 +220,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   function handleDelete(id: string) {
     checkpoint("delete");
     setBlocks((prev) => prev.filter((b) => b.id !== id));
-    setSelectedId((prev) => (prev === id ? null : prev));
+    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
     markDirty();
   }
 
@@ -234,6 +249,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
       // undo/redo work regardless of selection
       const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) handleRedo();
@@ -269,7 +289,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           e.preventDefault();
           checkpoint("delete");
           setBlocks((prev) => prev.filter((b) => b.id !== selectedId));
-          setSelectedId(null);
+          setSelectedIds([]);
           setDirty(true);
           break;
         case "ArrowUp":
@@ -289,7 +309,19 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest state each render
-  }, [mode, selectedId, blocks, canvas, title]);
+  }, [mode, selectedId, selectedIds, blocks, canvas, title]);
+
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      if (selectedIds.length === 0 || !(e.target instanceof Element)) return;
+      if (e.target.closest("[data-template-selection-preserving]")) return;
+      setSelectedIds([]);
+      setPanelTab("canvas");
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [selectedIds.length]);
 
   async function handleSave() {
     setSaving(true);
@@ -369,6 +401,15 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={handleSelectAll}
+          disabled={blocks.length === 0}
+          data-template-selection-preserving
+          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+        >
+          {selectedIds.length === blocks.length && blocks.length > 0 ? "Clear selection" : "Select all"}
+        </button>
         <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
           <button
             type="button"
@@ -473,7 +514,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <EditorCanvas
                 canvas={canvas}
                 blocks={blocks}
-                selectedId={selectedId}
+                selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onMove={handleMove}
                 onResize={handleResize}
@@ -485,7 +526,10 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               />
             </section>
 
-            <aside className="order-3 h-fit rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <aside
+              data-template-selection-preserving
+              className="order-3 h-fit rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+            >
               <div className="mb-4 grid grid-cols-2 gap-1">
                 {(["canvas", "block"] as const).map((tab) => (
                   <button
@@ -509,6 +553,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               ) : (
                 <BlockInspector
                   block={selectedBlock}
+                  selectedCount={selectedIds.length}
                   onChange={patchSelected}
                   onStyleChange={patchSelectedStyle}
                   onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}

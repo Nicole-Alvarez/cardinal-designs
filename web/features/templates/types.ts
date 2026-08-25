@@ -26,9 +26,15 @@ export type BlockType =
   | "image"
   | "icon"
   | "divider"
-  | "spacer";
+  | "spacer"
+  | "qr"
+  | "barcode";
 
 export type CodeLang = "html" | "react" | "angular";
+
+export function isSquareBlock(type: BlockType): boolean {
+  return type === "icon" || type === "qr";
+}
 
 export interface BlockStyle {
   color: string; // "inherit" = take main block's textColor
@@ -78,6 +84,7 @@ export interface TemplateCanvas {
   overlayPadding: number; // px transparent ring inside the image box
   borderWidth: number; // 0 = none
   borderColor: string;
+  borderRadius: number; // 0 = none
 }
 
 export const DEFAULT_CANVAS: TemplateCanvas = {
@@ -92,6 +99,7 @@ export const DEFAULT_CANVAS: TemplateCanvas = {
   overlayPadding: 0,
   borderWidth: 0,
   borderColor: "#e4e4e7",
+  borderRadius: 0,
 };
 
 /** Working pixel size used by the editor stage when canvas size is "auto". */
@@ -183,6 +191,8 @@ const LEGACY_DEFAULT_WIDTH: Record<BlockType, number> = {
   icon: 48,
   divider: 320,
   spacer: 120,
+  qr: 120,
+  barcode: 200,
 };
 
 /** Converts pre-Figma flow-layout blocks into stacked positioned blocks. */
@@ -325,6 +335,24 @@ export function createUniversalBlock(
         height: 48,
         icon: DEFAULT_ICON_NAME,
         style: defaultBlockStyle(),
+      };
+    case "qr":
+      return {
+        ...base,
+        type,
+        width: 120,
+        height: 120,
+        text: "https://example.com",
+        style: { ...defaultBlockStyle(), padding: 8 },
+      };
+    case "barcode":
+      return {
+        ...base,
+        type,
+        width: 200,
+        height: 80,
+        text: "123456789",
+        style: { ...defaultBlockStyle(), padding: 8 },
       };
     case "text":
     default:

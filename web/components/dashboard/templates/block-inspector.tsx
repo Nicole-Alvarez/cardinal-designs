@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { BlockStyle, BlockType, TemplateBlock } from "@/features/templates/types";
+import { isSquareBlock, type BlockStyle, type BlockType, type TemplateBlock } from "@/features/templates/types";
 import { uploadBlockImage } from "@/features/templates/queries";
 import { FONT_OPTIONS } from "@/features/templates/fonts";
 import { ColorInput, Field } from "./inspector-controls";
@@ -15,12 +15,15 @@ const VARIANTS: { type: BlockType; label: string }[] = [
   { type: "icon", label: "Icon" },
   { type: "divider", label: "Divider" },
   { type: "spacer", label: "Spacer" },
+  { type: "qr", label: "QR Code" },
+  { type: "barcode", label: "Barcode" },
 ];
 
 const FONT_WEIGHTS = [300, 400, 500, 600, 700];
 
 interface BlockInspectorProps {
   block: TemplateBlock | null;
+  selectedCount: number;
   onChange: (patch: Partial<TemplateBlock>) => void;
   onStyleChange: (patch: Partial<BlockStyle>) => void;
   onStack: (dir: "front" | "back") => void;
@@ -28,6 +31,7 @@ interface BlockInspectorProps {
 
 export default function BlockInspector({
   block,
+  selectedCount,
   onChange,
   onStyleChange,
   onStack,
@@ -55,7 +59,9 @@ export default function BlockInspector({
   if (!block) {
     return (
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
-        Select a block to edit its content and style.
+        {selectedCount > 1
+          ? `${selectedCount} blocks selected. Select one block to edit its content and style.`
+          : "Select a block to edit its content and style."}
       </p>
     );
   }
@@ -71,8 +77,8 @@ export default function BlockInspector({
           value={block.type}
           onChange={(e) => {
             const type = e.target.value as BlockType;
-            // icon blocks are square; adopt the current width as the size
-            if (type === "icon" && block.width !== block.height) {
+            // Square block types adopt the current width as their size.
+            if (isSquareBlock(type) && block.width !== block.height) {
               onChange({ type, height: block.width });
             } else {
               onChange({ type });
@@ -93,10 +99,10 @@ export default function BlockInspector({
       )}
 
       <Field label="Position & size">
-        <div className={block.type === "icon" ? "grid grid-cols-3 gap-1" : "grid grid-cols-4 gap-1"}>
+        <div className={isSquareBlock(block.type) ? "grid grid-cols-3 gap-1" : "grid grid-cols-4 gap-1"}>
           <GeometryInput label="X" value={block.x} onChange={(x) => onChange({ x })} />
           <GeometryInput label="Y" value={block.y} onChange={(y) => onChange({ y })} />
-          {block.type === "icon" ? (
+          {isSquareBlock(block.type) ? (
             <GeometryInput
               label="Size"
               value={block.width}
@@ -233,6 +239,17 @@ export default function BlockInspector({
         </>
       )}
 
+      {(block.type === "qr" || block.type === "barcode") && (
+        <Field label={block.type === "qr" ? "QR data" : "Barcode data"}>
+          <input
+            value={block.text ?? ""}
+            onChange={(e) => onChange({ text: e.target.value })}
+            placeholder={block.type === "qr" ? "https://example.com" : "123456789"}
+            className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+          />
+        </Field>
+      )}
+
       {block.type !== "spacer" && (
         <>
           <Field label="Text color">
@@ -254,9 +271,26 @@ export default function BlockInspector({
                     onChange={(e) => onStyleChange({ fontSize: Number(e.target.value) })}
                     className="flex-1 accent-zinc-900 dark:accent-zinc-100"
                   />
-                  <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                    {block.style.fontSize}px
-                  </span>
+                  {block.type === "text" ? (
+                    <input
+                      type="number"
+                      min={10}
+                      max={64}
+                      step={1}
+                      value={block.style.fontSize}
+                      onChange={(e) =>
+                        onStyleChange({
+                          fontSize: Math.max(10, Math.min(64, Number(e.target.value) || 10)),
+                        })
+                      }
+                      aria-label="Font size in pixels"
+                      className="w-16 rounded-lg border border-zinc-300 bg-transparent px-2 py-1 text-right text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-300"
+                    />
+                  ) : (
+                    <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                      {block.style.fontSize}px
+                    </span>
+                  )}
                 </div>
               </Field>
               <Field label="Font">

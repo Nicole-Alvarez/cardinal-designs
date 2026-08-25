@@ -27,6 +27,7 @@ export default function CanvasStage({
     borderWidth: canvas.borderWidth > 0 ? canvas.borderWidth : undefined,
     borderStyle: canvas.borderWidth > 0 ? "solid" : undefined,
     borderColor: canvas.borderWidth > 0 ? canvas.borderColor : undefined,
+    borderRadius: canvas.borderRadius || undefined,
   };
 
   const gridStyle: CSSProperties = showGrid

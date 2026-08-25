@@ -1,6 +1,8 @@
 import type { TemplateBlock, TemplateCanvas } from "./types";
 import { htmlIconSvg, jsxIconSvg } from "./icons";
 import { googleFamiliesIn } from "./fonts";
+import { barcodeDataUri } from "./barcode";
+import { qrDataUri } from "./qr";
 
 const IND = "  ";
 
@@ -37,6 +39,9 @@ function canvasRootCss(canvas: TemplateCanvas): string {
     parts.push(
       `border: ${canvas.borderWidth}px solid ${canvas.borderColor}`
     );
+  }
+  if (canvas.borderRadius > 0) {
+    parts.push(`border-radius: ${canvas.borderRadius}px`);
   }
   return parts.join("; ");
 }
@@ -88,6 +93,18 @@ function blockFrameCss(block: TemplateBlock): string {
   }
   if (block.style.borderRadius > 0) {
     parts.push(`border-radius: ${block.style.borderRadius}px`);
+  }
+  if (block.type === "heading" || block.type === "text") {
+    parts.push("display: flex", "align-items: center");
+    parts.push(
+      `justify-content: ${
+        block.style.textAlign === "center"
+          ? "center"
+          : block.style.textAlign === "right"
+            ? "flex-end"
+            : "flex-start"
+      }`
+    );
   }
   if (block.type === "divider") {
     parts.push("display: flex", "align-items: center");
@@ -151,6 +168,32 @@ function blockLines(block: TemplateBlock, out: string[]): void {
       out.push(`${IND}${open}`);
       const svg = htmlIconSvg(block.icon);
       if (svg) out.push(`${IND}${IND}${svg}`);
+      out.push(`${IND}${close}`);
+      break;
+    }
+    case "qr": {
+      const src = qrDataUri(block.text);
+      out.push(`${IND}${open}`);
+      if (src) {
+        out.push(
+          `${IND}${IND}<img src="${esc(src)}" alt="QR code" style="display: block; width: 100%; height: 100%; object-fit: contain;" />`
+        );
+      } else {
+        out.push(`${IND}${IND}<span>Enter QR data</span>`);
+      }
+      out.push(`${IND}${close}`);
+      break;
+    }
+    case "barcode": {
+      const src = barcodeDataUri(block.text);
+      out.push(`${IND}${open}`);
+      if (src) {
+        out.push(
+          `${IND}${IND}<img src="${esc(src)}" alt="Barcode: ${esc(block.text ?? "")}" style="display: block; width: 100%; height: 100%; object-fit: contain;" />`
+        );
+      } else {
+        out.push(`${IND}${IND}<span>Enter barcode data</span>`);
+      }
       out.push(`${IND}${close}`);
       break;
     }
@@ -252,6 +295,32 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       const svg = jsxIconSvg(block.icon);
       if (svg) out.push(`${pad2}${svg}`);
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "qr": {
+      const src = qrDataUri(block.text);
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      if (src) {
+        out.push(
+          `${pad2}<img src="${esc(src)}" alt="QR code" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />`
+        );
+      } else {
+        out.push(`${pad2}<span>Enter QR data</span>`);
+      }
+      out.push(`${pad}</div>`);
+      break;
+    }
+    case "barcode": {
+      const src = barcodeDataUri(block.text);
+      out.push(`${pad}<div style={{ ${wrapper} }}>`);
+      if (src) {
+        out.push(
+          `${pad2}<img src="${esc(src)}" alt="Barcode: ${esc(block.text ?? "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />`
+        );
+      } else {
+        out.push(`${pad2}<span>Enter barcode data</span>`);
+      }
       out.push(`${pad}</div>`);
       break;
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  isSquareBlock,
   workingCanvasSize,
   type TemplateBlock,
   type TemplateCanvas,
@@ -45,8 +46,8 @@ interface GapOverlay {
 interface EditorCanvasProps {
   canvas: TemplateCanvas;
   blocks: TemplateBlock[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedIds: string[];
+  onSelect: (id: string | null, additive?: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
   onResize: (
     id: string,
@@ -62,7 +63,7 @@ interface EditorCanvasProps {
 export default function EditorCanvas({
   canvas,
   blocks,
-  selectedId,
+  selectedIds,
   onSelect,
   onMove,
   onResize,
@@ -335,6 +336,7 @@ export default function EditorCanvas({
           <CanvasStage canvas={editorCanvas} showGrid={showGrid} gridSize={gridSize}>
             <div
               ref={stageRef}
+              data-template-selection-preserving
               className="absolute inset-0"
               onPointerDown={() => onSelect(null)}
               onDragOver={(e) => e.preventDefault()}
@@ -380,10 +382,10 @@ export default function EditorCanvas({
                   <BlockFrame
                     key={block.id}
                     block={block}
-                    selected={block.id === selectedId}
+                    selected={selectedIds.includes(block.id)}
                     scale={scale}
                     interacting={interacting === block.id}
-                    onSelect={() => onSelect(block.id)}
+                    onSelect={(additive) => onSelect(block.id, additive)}
                     onMove={onMove}
                     onResize={onResize}
                     onInteract={handleInteract}
@@ -524,7 +526,7 @@ function BlockFrame({
   selected: boolean;
   scale: number;
   interacting: boolean;
-  onSelect: () => void;
+  onSelect: (additive: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
   onResize: (
     id: string,
@@ -556,7 +558,7 @@ function BlockFrame({
     target: Element
   ) {
     e.stopPropagation();
-    onSelect();
+    onSelect(e.metaKey || e.ctrlKey);
     target.setPointerCapture(e.pointerId);
     const rect = frameRef.current?.getBoundingClientRect();
     const gestureScale =
@@ -598,8 +600,8 @@ function BlockFrame({
     if (dir.includes("s")) height = Math.max(MIN_SIZE, Math.round(orig.height + dy));
     if (dir.includes("w")) width = Math.max(MIN_SIZE, Math.round(orig.width - dx));
     if (dir.includes("n")) height = Math.max(MIN_SIZE, Math.round(orig.height - dy));
-    // icon blocks are always square: the dominant axis wins
-    if (block.type === "icon") {
+    // Square block types keep a 1:1 aspect ratio: the dominant axis wins.
+    if (isSquareBlock(block.type)) {
       const size = Math.max(width, height);
       width = size;
       height = size;
