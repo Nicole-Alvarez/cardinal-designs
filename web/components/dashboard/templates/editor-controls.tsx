@@ -46,7 +46,7 @@ export function EditorTooltip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none invisible absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${position}`}
+        className={`pointer-events-none invisible absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${position}`}
       >
         {label}
       </span>

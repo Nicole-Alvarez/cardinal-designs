@@ -20,7 +20,11 @@ import {
   detectTemplateFields,
   metadataFieldCount,
 } from "../metadata";
-import { useTemplateHistory, type TemplateSnapshot } from "../use-history";
+import {
+  useCodeHistory,
+  useTemplateHistory,
+  type TemplateSnapshot,
+} from "../use-history";
 import { htmlCodeToWysiwyg, reactCodeToWysiwyg } from "../react-to-wysiwyg";
 import {
   DEFAULT_CANVAS,
@@ -61,9 +65,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(8);
   const history = useTemplateHistory();
+  const codeHistory = useCodeHistory();
 
   useEffect(() => {
     history.setCurrent({ blocks, canvas, title });
+  });
+
+  useEffect(() => {
+    codeHistory.setCurrent(codeBuffers);
   });
 
   function snapshot(): TemplateSnapshot {
@@ -82,15 +91,29 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleUndo() {
-    if (mode !== "wysiwyg") return;
-    const s = history.undo();
-    if (s) applySnapshot(s);
+    if (mode === "code") {
+      const buffers = codeHistory.undo();
+      if (buffers) {
+        setCodeBuffers(buffers);
+        markDirty();
+      }
+      return;
+    }
+    const snapshot = history.undo();
+    if (snapshot) applySnapshot(snapshot);
   }
 
   function handleRedo() {
-    if (mode !== "wysiwyg") return;
-    const s = history.redo();
-    if (s) applySnapshot(s);
+    if (mode === "code") {
+      const buffers = codeHistory.redo();
+      if (buffers) {
+        setCodeBuffers(buffers);
+        markDirty();
+      }
+      return;
+    }
+    const snapshot = history.redo();
+    if (snapshot) applySnapshot(snapshot);
   }
 
   useEffect(() => {
@@ -268,17 +291,28 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   // Figma-lite keyboard shortcuts: undo/redo, delete, arrow-key nudge (1px / Shift 10px)
   useEffect(() => {
-    if (mode !== "wysiwyg") return;
     function isTyping(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false;
       const tag = target.tagName;
       return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
     }
     function onKey(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mode === "code") {
+        if (mod && (e.key === "z" || e.key === "Z")) {
+          e.preventDefault();
+          if (e.shiftKey) handleRedo();
+          else handleUndo();
+        } else if (e.ctrlKey && (e.key === "y" || e.key === "Y")) {
+          e.preventDefault();
+          handleRedo();
+        }
+        return;
+      }
+
       if (isTyping(e.target)) return;
 
       // undo/redo work regardless of selection
-      const mod = e.metaKey || e.ctrlKey;
       if (mod && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
         handleSelectAll();
@@ -391,6 +425,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleCodeChange(langKey: CodeLang, value: string) {
+    codeHistory.checkpoint(codeBuffers, `code:${langKey}`);
     setCodeBuffers((prev) => ({ ...prev, [langKey]: value }));
     markDirty();
   }
@@ -487,7 +522,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
           <EditorTooltip
             label={
-              selectedIds.length === blocks.length && blocks.length > 0
+              mode === "code"
+                ? "Select all is available in WYSIWYG mode"
+                : selectedIds.length === blocks.length && blocks.length > 0
                 ? "Clear block selection"
                 : "Select all blocks"
             }
@@ -495,10 +532,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
             <button
               type="button"
               onClick={handleSelectAll}
-              disabled={blocks.length === 0}
+              disabled={mode === "code" || blocks.length === 0}
               data-template-selection-preserving
               aria-label={
-                selectedIds.length === blocks.length && blocks.length > 0
+                mode === "code"
+                  ? "Select all is unavailable in Code mode"
+                  : selectedIds.length === blocks.length && blocks.length > 0
                   ? "Clear block selection"
                   : "Select all blocks"
               }
@@ -519,7 +558,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <button
                 type="button"
                 onClick={handleUndo}
-                disabled={!history.canUndo}
+                disabled={mode === "code" ? !codeHistory.canUndo : !history.canUndo}
                 className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
               >
                 Undo
@@ -529,7 +568,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <button
                 type="button"
                 onClick={handleRedo}
-                disabled={!history.canRedo}
+                disabled={mode === "code" ? !codeHistory.canRedo : !history.canRedo}
                 className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
               >
                 Redo
