@@ -43,6 +43,7 @@ interface DistanceMeasurement {
   y: number;
   length: number;
   value: number;
+  referenceBlockId?: string;
 }
 
 interface EditorCanvasProps {
@@ -117,6 +118,16 @@ export default function EditorCanvas({
     return computeDragSpacingGuides(dragBlock.id, dragBlock.x, dragBlock.y, dragBlock.w, dragBlock.h);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute when drag position or blocks change
   }, [dragBlock, blocks]);
+
+  const distanceReferenceIds = useMemo(
+    () =>
+      new Set(
+        dragGuides.flatMap((measurement) =>
+          measurement.referenceBlockId ? [measurement.referenceBlockId] : []
+        )
+      ),
+    [dragGuides]
+  );
 
   const edgeMeasurements = useMemo<DistanceMeasurement[]>(() => {
     if (!dragBlock) return [];
@@ -239,14 +250,20 @@ export default function EditorCanvas({
     const right = nx + w;
     const bottom = ny + h;
 
-    let bestUp: { dist: number; x: number; edge: number } | null = null;
-    let bestDown: { dist: number; x: number; edge: number } | null = null;
-    let bestLeft: { dist: number; y: number; edge: number } | null = null;
-    let bestRight: { dist: number; y: number; edge: number } | null = null;
+    let bestUp: { id: string; dist: number; x: number; edge: number } | null = null;
+    let bestDown: { id: string; dist: number; x: number; edge: number } | null = null;
+    let bestLeft: { id: string; dist: number; y: number; edge: number } | null = null;
+    let bestRight: { id: string; dist: number; y: number; edge: number } | null = null;
 
     const edges = blocks
       .filter((block) => block.id !== id)
-      .map((block) => ({ x: block.x, y: block.y, w: block.width, h: block.height }));
+      .map((block) => ({
+        id: block.id,
+        x: block.x,
+        y: block.y,
+        w: block.width,
+        h: block.height,
+      }));
     for (const e of edges) {
       const eRight = e.x + e.w;
       const eBottom = e.y + e.h;
@@ -260,25 +277,45 @@ export default function EditorCanvas({
       if (overlapsVertically && eRight <= nx) {
         const dist = nx - eRight;
         if (!bestLeft || dist < bestLeft.dist) {
-          bestLeft = { dist, y: (overlapYStart + overlapYEnd) / 2, edge: eRight };
+          bestLeft = {
+            id: e.id,
+            dist,
+            y: (overlapYStart + overlapYEnd) / 2,
+            edge: eRight,
+          };
         }
       }
       if (overlapsVertically && e.x >= right) {
         const dist = e.x - right;
         if (!bestRight || dist < bestRight.dist) {
-          bestRight = { dist, y: (overlapYStart + overlapYEnd) / 2, edge: e.x };
+          bestRight = {
+            id: e.id,
+            dist,
+            y: (overlapYStart + overlapYEnd) / 2,
+            edge: e.x,
+          };
         }
       }
       if (overlapsHorizontally && eBottom <= ny) {
         const dist = ny - eBottom;
         if (!bestUp || dist < bestUp.dist) {
-          bestUp = { dist, x: (overlapXStart + overlapXEnd) / 2, edge: eBottom };
+          bestUp = {
+            id: e.id,
+            dist,
+            x: (overlapXStart + overlapXEnd) / 2,
+            edge: eBottom,
+          };
         }
       }
       if (overlapsHorizontally && e.y >= bottom) {
         const dist = e.y - bottom;
         if (!bestDown || dist < bestDown.dist) {
-          bestDown = { dist, x: (overlapXStart + overlapXEnd) / 2, edge: e.y };
+          bestDown = {
+            id: e.id,
+            dist,
+            x: (overlapXStart + overlapXEnd) / 2,
+            edge: e.y,
+          };
         }
       }
     }
@@ -291,6 +328,7 @@ export default function EditorCanvas({
         y: bestLeft.y,
         length: bestLeft.dist,
         value: Math.round(bestLeft.dist),
+        referenceBlockId: bestLeft.id,
       });
     }
     if (bestRight) {
@@ -301,6 +339,7 @@ export default function EditorCanvas({
         y: bestRight.y,
         length: bestRight.dist,
         value: Math.round(bestRight.dist),
+        referenceBlockId: bestRight.id,
       });
     }
     if (bestUp) {
@@ -311,6 +350,7 @@ export default function EditorCanvas({
         y: bestUp.edge,
         length: bestUp.dist,
         value: Math.round(bestUp.dist),
+        referenceBlockId: bestUp.id,
       });
     }
     if (bestDown) {
@@ -321,6 +361,7 @@ export default function EditorCanvas({
         y: bottom,
         length: bestDown.dist,
         value: Math.round(bestDown.dist),
+        referenceBlockId: bestDown.id,
       });
     }
 
@@ -461,6 +502,11 @@ export default function EditorCanvas({
                     selected={selectedIds.includes(block.id)}
                     scale={scale}
                     interacting={interacting === block.id}
+                    comparisonOutline={
+                      distanceReferenceIds.has(block.id)
+                        ? guidePalette.measurement
+                        : undefined
+                    }
                     onSelect={(additive) => onSelect(block.id, additive)}
                     onMove={onMove}
                     onResize={onResize}
@@ -638,6 +684,7 @@ function BlockFrame({
   selected,
   scale,
   interacting,
+  comparisonOutline,
   onSelect,
   onMove,
   onResize,
@@ -651,6 +698,7 @@ function BlockFrame({
   selected: boolean;
   scale: number;
   interacting: boolean;
+  comparisonOutline?: string;
   onSelect: (additive: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
   onResize: (
@@ -743,6 +791,9 @@ function BlockFrame({
   }
 
   const inv = 1 / scale;
+  const outlineColor = interacting
+    ? "#3b82f6"
+    : comparisonOutline ?? (selected ? "#3b82f6" : undefined);
 
   return (
     <div
@@ -757,7 +808,7 @@ function BlockFrame({
         cursor: "move",
         touchAction: "none",
         userSelect: "none",
-        outline: selected ? `${1.5 * inv}px solid #3b82f6` : undefined,
+        outline: outlineColor ? `${1.5 * inv}px solid ${outlineColor}` : undefined,
         outlineOffset: 0,
       }}
       onPointerDown={(e) => beginGesture(e, "move", e.currentTarget)}
