@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  canvasGuidePalette,
+  type CanvasGuidePalette,
+} from "@/features/templates/canvas-guides";
+import {
   isSquareBlock,
   workingCanvasSize,
   type TemplateBlock,
@@ -15,17 +19,6 @@ const PANE_PADDING = 32;
 const SNAP_THRESHOLD = 6;
 
 type ResizeDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
-
-interface SpacingGuide {
-  dir: "up" | "down" | "left" | "right";
-  dist: number;
-  x?: number;
-  y?: number;
-  x1?: number;
-  x2?: number;
-  y1?: number;
-  y2?: number;
-}
 
 interface PaddingOverlay {
   x: number;
@@ -41,6 +34,15 @@ interface GapOverlay {
   w: number;
   h: number;
   label: string;
+}
+
+interface DistanceMeasurement {
+  key: string;
+  orientation: "horizontal" | "vertical";
+  x: number;
+  y: number;
+  length: number;
+  value: number;
 }
 
 interface EditorCanvasProps {
@@ -90,6 +92,7 @@ export default function EditorCanvas({
   } | null>(null);
 
   const size = workingCanvasSize(canvas);
+  const guidePalette = canvasGuidePalette(canvas.backgroundColor, canvas.textColor);
   const editorCanvas: TemplateCanvas = {
     ...canvas,
     width: `${size.width}px`,
@@ -109,11 +112,51 @@ export default function EditorCanvas({
     return () => ro.disconnect();
   }, [size.width]);
 
-  const dragGuides = useMemo<SpacingGuide[]>(() => {
-    if (!dragBlock || !showSpacing) return [];
+  const dragGuides = useMemo<DistanceMeasurement[]>(() => {
+    if (!dragBlock) return [];
     return computeDragSpacingGuides(dragBlock.id, dragBlock.x, dragBlock.y, dragBlock.w, dragBlock.h);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute when drag position or spacing toggle changes
-  }, [dragBlock, showSpacing, blocks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute when drag position or blocks change
+  }, [dragBlock, blocks]);
+
+  const edgeMeasurements = useMemo<DistanceMeasurement[]>(() => {
+    if (!dragBlock) return [];
+    const right = dragBlock.x + dragBlock.w;
+    const bottom = dragBlock.y + dragBlock.h;
+    const centerX = dragBlock.x + dragBlock.w / 2;
+    const centerY = dragBlock.y + dragBlock.h / 2;
+    const horizontal = (
+      key: string,
+      start: number,
+      end: number,
+      y: number
+    ): DistanceMeasurement => ({
+      key,
+      orientation: "horizontal",
+      x: Math.min(start, end),
+      y,
+      length: Math.abs(end - start),
+      value: Math.round(end - start),
+    });
+    const vertical = (
+      key: string,
+      start: number,
+      end: number,
+      x: number
+    ): DistanceMeasurement => ({
+      key,
+      orientation: "vertical",
+      x,
+      y: Math.min(start, end),
+      length: Math.abs(end - start),
+      value: Math.round(end - start),
+    });
+    return [
+      horizontal("left", 0, dragBlock.x, centerY),
+      horizontal("right", right, size.width, centerY),
+      vertical("top", 0, dragBlock.y, centerX),
+      vertical("bottom", bottom, size.height, centerX),
+    ];
+  }, [dragBlock, size.width, size.height]);
 
   function stagePoint(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const rect = stageRef.current?.getBoundingClientRect();
@@ -191,62 +234,94 @@ export default function EditorCanvas({
     ny: number,
     w: number,
     h: number
-  ): SpacingGuide[] {
-    const MAX_DIST = 150;
-    const result: SpacingGuide[] = [];
+  ): DistanceMeasurement[] {
+    const result: DistanceMeasurement[] = [];
     const right = nx + w;
     const bottom = ny + h;
 
-    let bestUp: { dist: number; y: number } | null = null;
-    let bestDown: { dist: number; y: number } | null = null;
-    let bestLeft: { dist: number; x: number } | null = null;
-    let bestRight: { dist: number; x: number } | null = null;
+    let bestUp: { dist: number; x: number; edge: number } | null = null;
+    let bestDown: { dist: number; x: number; edge: number } | null = null;
+    let bestLeft: { dist: number; y: number; edge: number } | null = null;
+    let bestRight: { dist: number; y: number; edge: number } | null = null;
 
-    const edges = [
-      { x: 0, y: 0, w: size.width, h: 0 },
-      ...blocks.filter((b) => b.id !== id).map((b) => ({ x: b.x, y: b.y, w: b.width, h: b.height })),
-    ];
+    const edges = blocks
+      .filter((block) => block.id !== id)
+      .map((block) => ({ x: block.x, y: block.y, w: block.width, h: block.height }));
     for (const e of edges) {
       const eRight = e.x + e.w;
       const eBottom = e.y + e.h;
+      const overlapXStart = Math.max(nx, e.x);
+      const overlapXEnd = Math.min(right, eRight);
+      const overlapYStart = Math.max(ny, e.y);
+      const overlapYEnd = Math.min(bottom, eBottom);
+      const overlapsHorizontally = overlapXEnd > overlapXStart;
+      const overlapsVertically = overlapYEnd > overlapYStart;
 
-      if (eRight <= nx) {
+      if (overlapsVertically && eRight <= nx) {
         const dist = nx - eRight;
-        if (dist <= MAX_DIST && (!bestLeft || dist < bestLeft.dist)) {
-          bestLeft = { dist, x: (eRight + nx) / 2 };
+        if (!bestLeft || dist < bestLeft.dist) {
+          bestLeft = { dist, y: (overlapYStart + overlapYEnd) / 2, edge: eRight };
         }
       }
-      if (e.x >= right) {
+      if (overlapsVertically && e.x >= right) {
         const dist = e.x - right;
-        if (dist <= MAX_DIST && (!bestRight || dist < bestRight.dist)) {
-          bestRight = { dist, x: (right + e.x) / 2 };
+        if (!bestRight || dist < bestRight.dist) {
+          bestRight = { dist, y: (overlapYStart + overlapYEnd) / 2, edge: e.x };
         }
       }
-      if (eBottom <= ny) {
+      if (overlapsHorizontally && eBottom <= ny) {
         const dist = ny - eBottom;
-        if (dist <= MAX_DIST && (!bestUp || dist < bestUp.dist)) {
-          bestUp = { dist, y: (eBottom + ny) / 2 };
+        if (!bestUp || dist < bestUp.dist) {
+          bestUp = { dist, x: (overlapXStart + overlapXEnd) / 2, edge: eBottom };
         }
       }
-      if (e.y >= bottom) {
+      if (overlapsHorizontally && e.y >= bottom) {
         const dist = e.y - bottom;
-        if (dist <= MAX_DIST && (!bestDown || dist < bestDown.dist)) {
-          bestDown = { dist, y: (bottom + e.y) / 2 };
+        if (!bestDown || dist < bestDown.dist) {
+          bestDown = { dist, x: (overlapXStart + overlapXEnd) / 2, edge: e.y };
         }
       }
     }
 
     if (bestLeft) {
-      result.push({ dir: "left", dist: bestLeft.dist, x: bestLeft.x, y1: ny, y2: bottom });
+      result.push({
+        key: "block-left",
+        orientation: "horizontal",
+        x: bestLeft.edge,
+        y: bestLeft.y,
+        length: bestLeft.dist,
+        value: Math.round(bestLeft.dist),
+      });
     }
     if (bestRight) {
-      result.push({ dir: "right", dist: bestRight.dist, x: bestRight.x, y1: ny, y2: bottom });
+      result.push({
+        key: "block-right",
+        orientation: "horizontal",
+        x: right,
+        y: bestRight.y,
+        length: bestRight.dist,
+        value: Math.round(bestRight.dist),
+      });
     }
     if (bestUp) {
-      result.push({ dir: "up", dist: bestUp.dist, y: bestUp.y, x1: nx, x2: right });
+      result.push({
+        key: "block-top",
+        orientation: "vertical",
+        x: bestUp.x,
+        y: bestUp.edge,
+        length: bestUp.dist,
+        value: Math.round(bestUp.dist),
+      });
     }
     if (bestDown) {
-      result.push({ dir: "down", dist: bestDown.dist, y: bestDown.y, x1: nx, x2: right });
+      result.push({
+        key: "block-bottom",
+        orientation: "vertical",
+        x: bestDown.x,
+        y: bottom,
+        length: bestDown.dist,
+        value: Math.round(bestDown.dist),
+      });
     }
 
     return result;
@@ -351,8 +426,8 @@ export default function EditorCanvas({
                     top: p.y + p.pad,
                     width: Math.max(0, p.w - p.pad * 2),
                     height: Math.max(0, p.h - p.pad * 2),
-                    backgroundColor: "rgba(59,130,246,0.12)",
-                    border: "1px dashed rgba(59,130,246,0.4)",
+                    backgroundColor: guidePalette.paddingFill,
+                    border: `1px dashed ${guidePalette.paddingBorder}`,
                   }}
                 />
               ))}
@@ -365,7 +440,7 @@ export default function EditorCanvas({
                     top: g.y,
                     width: g.w,
                     height: g.h,
-                    backgroundColor: "rgba(249,115,22,0.15)",
+                    backgroundColor: guidePalette.gapFill,
                   }}
                 >
                   <span
@@ -408,7 +483,7 @@ export default function EditorCanvas({
                     top: 0,
                     width: 0,
                     height: "100%",
-                    borderLeft: "1px dashed #3b82f6",
+                    borderLeft: `1px dashed ${guidePalette.alignment}`,
                   }}
                 />
               ))}
@@ -421,92 +496,139 @@ export default function EditorCanvas({
                     left: 0,
                     height: 0,
                     width: "100%",
-                    borderTop: "1px dashed #3b82f6",
+                    borderTop: `1px dashed ${guidePalette.alignment}`,
                   }}
                 />
               ))}
-              {showSpacing && dragGuides.map((g, i) => {
-                const inv = 1 / scale;
-                if (g.dir === "left" || g.dir === "right") {
-                  return (
-                    <span
-                      key={`sg${i}`}
-                      className="pointer-events-none absolute z-20 flex flex-col items-center justify-center"
-                      style={{
-                        left: g.x! - 1,
-                        top: g.y1!,
-                        width: 2,
-                        height: g.y2! - g.y1!,
-                      }}
-                    >
-                      <span
-                        className="absolute"
-                        style={{
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          width: g.dist,
-                          height: 0,
-                          borderTop: "1px solid #3b82f6",
-                        }}
-                      />
-                      <span
-                        className="absolute whitespace-nowrap rounded bg-blue-500 px-1 font-mono text-white"
-                        style={{
-                          top: "50%",
-                          left: g.dist / 2,
-                          transform: "translate(-50%, -50%)",
-                          fontSize: 10 * inv,
-                          lineHeight: `${14 * inv}px`,
-                          paddingInline: 3 * inv,
-                        }}
-                      >
-                        {Math.round(g.dist)}px
-                      </span>
-                    </span>
-                  );
-                }
-                return (
-                  <span
-                    key={`sg${i}`}
-                    className="pointer-events-none absolute z-20 flex items-center justify-center"
-                    style={{
-                      top: g.y! - 1,
-                      left: g.x1!,
-                      height: 2,
-                      width: g.x2! - g.x1!,
-                    }}
-                  >
-                    <span
-                      className="absolute"
-                      style={{
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        height: g.dist,
-                        width: 0,
-                        borderLeft: "1px solid #3b82f6",
-                      }}
-                    />
-                    <span
-                      className="absolute whitespace-nowrap rounded bg-blue-500 px-1 font-mono text-white"
-                      style={{
-                        left: "50%",
-                        top: g.dist / 2,
-                        transform: "translate(-50%, -50%)",
-                        fontSize: 10 * inv,
-                        lineHeight: `${14 * inv}px`,
-                        paddingInline: 3 * inv,
-                      }}
-                    >
-                      {Math.round(g.dist)}px
-                    </span>
-                  </span>
-                );
-              })}
+              {dragGuides.map((measurement) => (
+                <DistanceMeasurementGuide
+                  key={measurement.key}
+                  measurement={measurement}
+                  inv={1 / scale}
+                  palette={guidePalette}
+                />
+              ))}
+              {edgeMeasurements.map((measurement) => (
+                <DistanceMeasurementGuide
+                  key={measurement.key}
+                  measurement={measurement}
+                  inv={1 / scale}
+                  palette={guidePalette}
+                />
+              ))}
             </div>
           </CanvasStage>
         </div>
       </div>
     </div>
+  );
+}
+
+function DistanceMeasurementGuide({
+  measurement,
+  inv,
+  palette,
+}: {
+  measurement: DistanceMeasurement;
+  inv: number;
+  palette: CanvasGuidePalette;
+}) {
+  const lineWidth = Math.max(inv, 0.5);
+  const tickSize = 6 * inv;
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10 * inv,
+    lineHeight: `${14 * inv}px`,
+    paddingInline: 3 * inv,
+    backgroundColor: palette.labelBackground,
+    color: palette.labelText,
+  };
+
+  if (measurement.orientation === "horizontal") {
+    return (
+      <span
+        className="pointer-events-none absolute z-30"
+        style={{
+          left: measurement.x,
+          top: measurement.y,
+          width: measurement.length,
+          height: 0,
+          borderTop: `${lineWidth}px solid ${palette.measurement}`,
+        }}
+      >
+        <span
+          className="absolute"
+          style={{
+            left: 0,
+            top: -tickSize / 2,
+            height: tickSize,
+            borderLeft: `${lineWidth}px solid ${palette.measurement}`,
+          }}
+        />
+        <span
+          className="absolute"
+          style={{
+            right: 0,
+            top: -tickSize / 2,
+            height: tickSize,
+            borderRight: `${lineWidth}px solid ${palette.measurement}`,
+          }}
+        />
+        <span
+          className="absolute whitespace-nowrap rounded font-mono"
+          style={{
+            ...labelStyle,
+            left: measurement.length / 2,
+            top: -8 * inv,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          {measurement.value}px
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="pointer-events-none absolute z-30"
+      style={{
+        left: measurement.x,
+        top: measurement.y,
+        width: 0,
+        height: measurement.length,
+        borderLeft: `${lineWidth}px solid ${palette.measurement}`,
+      }}
+    >
+      <span
+        className="absolute"
+        style={{
+          left: -tickSize / 2,
+          top: 0,
+          width: tickSize,
+          borderTop: `${lineWidth}px solid ${palette.measurement}`,
+        }}
+      />
+      <span
+        className="absolute"
+        style={{
+          left: -tickSize / 2,
+          bottom: 0,
+          width: tickSize,
+          borderBottom: `${lineWidth}px solid ${palette.measurement}`,
+        }}
+      />
+      <span
+        className="absolute whitespace-nowrap rounded font-mono"
+        style={{
+          ...labelStyle,
+          left: 8 * inv,
+          top: measurement.length / 2,
+          transform: "translateY(-50%)",
+        }}
+      >
+        {measurement.value}px
+      </span>
+    </span>
   );
 }
 

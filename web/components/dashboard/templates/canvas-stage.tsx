@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { canvasGuidePalette } from "@/features/templates/canvas-guides";
 import type { TemplateCanvas } from "@/features/templates/types";
 
 export default function CanvasStage({
@@ -14,6 +15,7 @@ export default function CanvasStage({
   showGrid?: boolean;
   gridSize?: number;
 }) {
+  const guidePalette = canvasGuidePalette(canvas.backgroundColor, canvas.textColor);
   const style: CSSProperties = {
     width: canvas.width === "auto" ? "100%" : canvas.width,
     height: canvas.height === "auto" ? undefined : canvas.height,
@@ -32,8 +34,9 @@ export default function CanvasStage({
 
   const gridStyle: CSSProperties = showGrid
     ? {
-        backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)`,
+        backgroundImage: `linear-gradient(to right, ${guidePalette.grid} 1px, transparent 1px), linear-gradient(to bottom, ${guidePalette.grid} 1px, transparent 1px)`,
         backgroundSize: `${gridSize}px ${gridSize}px`,
+        backgroundPosition: "left top",
       }
     : {};
 
