@@ -26,20 +26,32 @@ const DIVIDER_STYLE: React.CSSProperties = {
   alignItems: "center",
 };
 
+function textStyle(block: TemplateBlock): React.CSSProperties {
+  return {
+    margin: 0,
+    color: block.style.color === "inherit" ? undefined : block.style.color,
+    fontSize: block.style.fontSize,
+    fontWeight: block.style.fontWeight,
+    fontFamily: block.style.fontFamily,
+    fontStyle: block.style.italic ? "italic" : undefined,
+    textDecoration: block.style.underline ? "underline" : undefined,
+  };
+}
+
 export default function BlockPreview({ block }: { block: TemplateBlock }) {
   switch (block.type) {
     case "heading": {
       const Tag = (`h${block.level ?? 2}` as unknown) as "h2";
       return (
         <div style={wrapperStyle(block.style)}>
-          <Tag style={{ margin: 0, color: block.style.color === "inherit" ? undefined : block.style.color, fontSize: block.style.fontSize, fontWeight: block.style.fontWeight }}>{block.text}</Tag>
+          <Tag style={textStyle(block)}>{block.text}</Tag>
         </div>
       );
     }
     case "text":
       return (
         <div style={wrapperStyle(block.style)}>
-          <p style={{ margin: 0, ...(block.style.color !== "inherit" ? { color: block.style.color } : {}), fontSize: block.style.fontSize, fontWeight: block.style.fontWeight }}>{block.text}</p>
+          <p style={textStyle(block)}>{block.text}</p>
         </div>
       );
     case "button":
@@ -52,8 +64,10 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
               display: "inline-block",
               padding: "10px 20px",
               borderRadius: 8,
-              textDecoration: "none",
+              textDecoration: block.style.underline ? "underline" : "none",
               whiteSpace: "nowrap",
+              fontFamily: block.style.fontFamily,
+              fontStyle: block.style.italic ? "italic" : undefined,
             }}
           >
             {block.text}

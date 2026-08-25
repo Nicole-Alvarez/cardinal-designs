@@ -9,6 +9,8 @@ import CodeEditorPanel from "@/components/dashboard/templates/code-editor-panel"
 import CodeOutput from "@/components/dashboard/templates/code-output";
 import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
+import { GOOGLE_FONTS_URL } from "../fonts";
+import { useTemplateHistory, type TemplateSnapshot } from "../use-history";
 import {
   DEFAULT_CANVAS,
   createUniversalBlock,
@@ -41,6 +43,38 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const history = useTemplateHistory();
+
+  useEffect(() => {
+    history.setCurrent({ blocks, canvas, title });
+  });
+
+  function snapshot(): TemplateSnapshot {
+    return { blocks, canvas, title };
+  }
+
+  function checkpoint(tag: string) {
+    history.checkpoint(snapshot(), tag);
+  }
+
+  function applySnapshot(s: TemplateSnapshot) {
+    setBlocks(s.blocks);
+    setCanvas(s.canvas);
+    setTitle(s.title);
+    markDirty();
+  }
+
+  function handleUndo() {
+    if (mode !== "wysiwyg") return;
+    const s = history.undo();
+    if (s) applySnapshot(s);
+  }
+
+  function handleRedo() {
+    if (mode !== "wysiwyg") return;
+    const s = history.redo();
+    if (s) applySnapshot(s);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +125,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function addBlockCentered() {
     const size = workingCanvasSize(canvas);
+    checkpoint("add");
     const block = createUniversalBlock(
       (size.width - 280) / 2,
       (size.height - 44) / 2,
@@ -104,6 +139,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function addBlockAt(x: number, y: number) {
+    checkpoint("add");
     const block = createUniversalBlock(x, y, "text", nextZ());
     setBlocks((prev) => [...prev, block]);
     setSelectedId(block.id);
@@ -117,6 +153,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleMove(id: string, x: number, y: number) {
+    checkpoint(`move:${id}`);
     setBlocks((prev) =>
       prev.map((b) => (b.id === id ? { ...b, x, y } : b))
     );
@@ -127,12 +164,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     id: string,
     patch: { x?: number; y?: number; width: number; height: number }
   ) {
+    checkpoint(`resize:${id}`);
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
     markDirty();
   }
 
   function patchSelected(patch: Partial<TemplateBlock>) {
     if (!selectedBlock) return;
+    checkpoint(`insp:${selectedBlock.id}`);
     setBlocks((prev) =>
       prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b))
     );
@@ -141,6 +180,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function patchSelectedStyle(patch: Partial<BlockStyle>) {
     if (!selectedBlock) return;
+    checkpoint(`insp:${selectedBlock.id}`);
     setBlocks((prev) =>
       prev.map((b) =>
         b.id === selectedBlock.id ? { ...b, style: { ...b.style, ...patch } } : b
@@ -150,6 +190,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function patchCanvas(patch: Partial<TemplateCanvas>) {
+    checkpoint("canvas");
     setCanvas((prev) => ({ ...prev, ...patch }));
     markDirty();
   }
@@ -159,12 +200,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleDelete(id: string) {
+    checkpoint("delete");
     setBlocks((prev) => prev.filter((b) => b.id !== id));
     setSelectedId((prev) => (prev === id ? null : prev));
     markDirty();
   }
 
   function stackBlock(id: string, dir: "front" | "back") {
+    checkpoint(`stack:${id}`);
     setBlocks((prev) => {
       if (!prev.some((b) => b.id === id)) return prev;
       const maxZ = prev.reduce((m, b) => Math.max(m, b.z), -1);
@@ -175,7 +218,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     markDirty();
   }
 
-  // Figma-lite keyboard shortcuts: delete + arrow-key nudge (1px / Shift 10px)
+  // Figma-lite keyboard shortcuts: undo/redo, delete, arrow-key nudge (1px / Shift 10px)
   useEffect(() => {
     if (mode !== "wysiwyg") return;
     function isTyping(target: EventTarget | null): boolean {
@@ -184,9 +227,26 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
     }
     function onKey(e: KeyboardEvent) {
-      if (!selectedId || isTyping(e.target)) return;
+      if (isTyping(e.target)) return;
+
+      // undo/redo work regardless of selection
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+        return;
+      }
+      if (e.ctrlKey && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      if (!selectedId) return;
       const nudge = (dx: number, dy: number) => {
         e.preventDefault();
+        checkpoint("nudge");
         setBlocks((prev) =>
           prev.map((b) =>
             b.id === selectedId ? { ...b, x: b.x + dx, y: b.y + dy } : b
@@ -198,6 +258,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         case "Delete":
         case "Backspace":
           e.preventDefault();
+          checkpoint("delete");
           setBlocks((prev) => prev.filter((b) => b.id !== selectedId));
           setSelectedId(null);
           setDirty(true);
@@ -218,7 +279,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, selectedId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest state each render
+  }, [mode, selectedId, blocks, canvas, title]);
 
   async function handleSave() {
     setSaving(true);
@@ -251,6 +313,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleRename(value: string) {
+    checkpoint("rename");
     setTitle(value);
     markDirty();
   }
@@ -266,6 +329,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
+      {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/dashboard/templates"
@@ -295,6 +359,28 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               {m === "wysiwyg" ? "WYSIWYG" : "Code"}
             </button>
           ))}
+        </div>
+        <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={!history.canUndo}
+            aria-label="Undo"
+            title="Undo (⌘Z)"
+            className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            onClick={handleRedo}
+            disabled={!history.canRedo}
+            aria-label="Redo"
+            title="Redo (⇧⌘Z)"
+            className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            ↷
+          </button>
         </div>
         {dirty && (
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">

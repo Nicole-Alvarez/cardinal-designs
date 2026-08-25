@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { BlockStyle, BlockType, TemplateBlock } from "@/features/templates/types";
 import { uploadBlockImage } from "@/features/templates/queries";
+import { FONT_OPTIONS } from "@/features/templates/fonts";
 import { ColorInput, Field } from "./inspector-controls";
 import IconPicker from "./icon-picker";
 
@@ -258,6 +259,58 @@ export default function BlockInspector({
                   </span>
                 </div>
               </Field>
+              <Field label="Font">
+                <select
+                  value={block.style.fontFamily ?? ""}
+                  onChange={(e) =>
+                    onStyleChange({ fontFamily: e.target.value || undefined })
+                  }
+                  className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+                >
+                  <option value="">Default</option>
+                  {(["Web-safe", "Google"] as const).map((group) => (
+                    <optgroup key={group} label={group}>
+                      {FONT_OPTIONS.filter((f) => f.group === group).map((f) => (
+                        <option key={f.stack} value={f.stack}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </Field>
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  type="button"
+                  aria-label="Italic"
+                  title="Italic"
+                  aria-pressed={!!block.style.italic}
+                  onClick={() => onStyleChange({ italic: !block.style.italic })}
+                  className={
+                    "h-7 w-7 rounded-lg border text-sm italic transition-colors " +
+                    (block.style.italic
+                      ? "border-zinc-900 bg-zinc-100 text-zinc-900 dark:border-zinc-100 dark:bg-zinc-800 dark:text-zinc-50"
+                      : "border-transparent text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800")
+                  }
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  aria-label="Underline"
+                  title="Underline"
+                  aria-pressed={!!block.style.underline}
+                  onClick={() => onStyleChange({ underline: !block.style.underline })}
+                  className={
+                    "h-7 w-7 rounded-lg border text-sm underline transition-colors " +
+                    (block.style.underline
+                      ? "border-zinc-900 bg-zinc-100 text-zinc-900 dark:border-zinc-100 dark:bg-zinc-800 dark:text-zinc-50"
+                      : "border-transparent text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800")
+                  }
+                >
+                  U
+                </button>
+              </div>
               <Field label="Font weight">
                 <div className="flex items-center gap-2">
                   <select

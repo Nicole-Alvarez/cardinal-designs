@@ -35,6 +35,10 @@ export interface BlockStyle {
   backgroundColor: string;
   fontSize: number;
   fontWeight: number;
+  /** Full CSS font-family stack; absent = app default. */
+  fontFamily?: string;
+  italic?: boolean;
+  underline?: boolean;
   textAlign: "left" | "center" | "right";
   padding: number;
   borderWidth: number; // 0 = none

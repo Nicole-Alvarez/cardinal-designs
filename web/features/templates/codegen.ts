@@ -1,5 +1,6 @@
 import type { TemplateBlock, TemplateCanvas } from "./types";
 import { htmlIconSvg, jsxIconSvg } from "./icons";
+import { googleFamiliesIn } from "./fonts";
 
 const IND = "  ";
 
@@ -97,9 +98,20 @@ function blockFrameCss(block: TemplateBlock): string {
 function blockInnerCss(block: TemplateBlock): string {
   const parts = ["margin: 0"];
   if (block.style.color !== "inherit") parts.push(`color: ${block.style.color}`);
+  if (block.style.fontFamily) parts.push(`font-family: ${block.style.fontFamily}`);
+  if (block.style.italic) parts.push("font-style: italic");
+  if (block.style.underline) parts.push("text-decoration: underline");
   parts.push(`font-size: ${block.style.fontSize}px`);
   parts.push(`font-weight: ${block.style.fontWeight}`);
   return parts.join("; ");
+}
+
+/** Google Fonts stylesheet link for families used across the given blocks, or null. */
+function googleFontLink(blocks: TemplateBlock[]): string | null {
+  const used = googleFamiliesIn(blocks.map((b) => b.style.fontFamily));
+  if (used.length === 0) return null;
+  const query = used.map((f) => `family=${f.googleQuery}`).join("&");
+  return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${query}&display=swap" />`;
 }
 
 function blockLines(block: TemplateBlock, out: string[]): void {
@@ -158,7 +170,10 @@ function blockLines(block: TemplateBlock, out: string[]): void {
 }
 
 export function blocksToHtml(blocks: TemplateBlock[], canvas: TemplateCanvas): string {
-  const out: string[] = [`<div style="${canvasRootCss(canvas)}">`];
+  const out: string[] = [];
+  const fontLink = googleFontLink(blocks);
+  if (fontLink) out.push(fontLink);
+  out.push(`<div style="${canvasRootCss(canvas)}">`);
 
   const overlay = overlayCss(canvas);
   if (overlay) {
@@ -261,11 +276,14 @@ export function blocksToReact(
   canvas: TemplateCanvas
 ): string {
   const name = pascalIdentifier(title);
-  const out: string[] = [
+  const out: string[] = [];
+  const reactFontLink = googleFontLink(blocks);
+  if (reactFontLink) out.push(reactFontLink, "");
+  out.push(
     "export default function " + name + "() {",
     `${IND}return (`,
-    `${IND}${IND}<div style={{ ${reactStyleEntries(canvasRootCss(canvas))} }}>`,
-  ];
+    `${IND}${IND}<div style={{ ${reactStyleEntries(canvasRootCss(canvas))} }}>`
+  );
 
   const overlay = overlayCss(canvas);
   if (overlay) {
@@ -303,7 +321,13 @@ export function blocksToAngular(
   body.push(`${IND}${IND}${IND}</div>`);
   body.push(`${IND}${IND}</div>`);
 
-  return `import { Component } from "@angular/core";
+  const angularFontLink = googleFontLink(blocks);
+  // Angular strips <link>/<style> from component templates, so instruct on index.html
+  const fontComment = angularFontLink
+    ? `// Uses Google Fonts — add to your index.html:\n// ${angularFontLink}\n`
+    : "";
+
+  return `${fontComment}import { Component } from "@angular/core";
 
 @Component({
   selector: "app-${selector}",
