@@ -43,6 +43,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSpacing, setShowSpacing] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridSize, setGridSize] = useState(8);
   const history = useTemplateHistory();
 
   useEffect(() => {
@@ -243,6 +246,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         return;
       }
 
+      if (!mod && !e.shiftKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        setShowSpacing((prev) => !prev);
+        return;
+      }
+
       if (!selectedId) return;
       const nudge = (dx: number, dy: number) => {
         e.preventDefault();
@@ -382,6 +391,48 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
             ↷
           </button>
         </div>
+        <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
+          <button
+            type="button"
+            onClick={() => setShowSpacing((prev) => !prev)}
+            aria-label="Toggle spacing overlay"
+            title="Spacing overlay (S)"
+            className={
+              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors " +
+              (showSpacing
+                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
+            }
+          >
+            SJ
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowGrid((prev) => !prev)}
+            aria-label="Toggle grid"
+            title="Show grid"
+            className={
+              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors " +
+              (showGrid
+                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
+            }
+          >
+            #
+          </button>
+          {showGrid && (
+            <input
+              type="number"
+              value={gridSize}
+              onChange={(e) => setGridSize(Math.max(4, Math.min(64, Number(e.target.value) || 8)))}
+              aria-label="Grid size in pixels"
+              title="Grid size (4-64px)"
+              className="w-12 rounded-md border border-zinc-300 bg-white px-1 py-0.5 text-center text-xs font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+              min={4}
+              max={64}
+            />
+          )}
+        </div>
         {dirty && (
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
             Unsaved changes
@@ -428,6 +479,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 onResize={handleResize}
                 onAddAt={addBlockAt}
                 onDelete={handleDelete}
+                showSpacing={showSpacing}
+                showGrid={showGrid}
+                gridSize={gridSize}
               />
             </section>
 

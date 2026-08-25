@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   workingCanvasSize,
   type TemplateBlock,
@@ -15,6 +15,33 @@ const SNAP_THRESHOLD = 6;
 
 type ResizeDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
+interface SpacingGuide {
+  dir: "up" | "down" | "left" | "right";
+  dist: number;
+  x?: number;
+  y?: number;
+  x1?: number;
+  x2?: number;
+  y1?: number;
+  y2?: number;
+}
+
+interface PaddingOverlay {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  pad: number;
+}
+
+interface GapOverlay {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+}
+
 interface EditorCanvasProps {
   canvas: TemplateCanvas;
   blocks: TemplateBlock[];
@@ -27,6 +54,9 @@ interface EditorCanvasProps {
   ) => void;
   onAddAt: (x: number, y: number) => void;
   onDelete: (id: string) => void;
+  showSpacing?: boolean;
+  showGrid?: boolean;
+  gridSize?: number;
 }
 
 export default function EditorCanvas({
@@ -38,6 +68,9 @@ export default function EditorCanvas({
   onResize,
   onAddAt,
   onDelete,
+  showSpacing = false,
+  showGrid = false,
+  gridSize = 8,
 }: EditorCanvasProps) {
   const paneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -47,6 +80,13 @@ export default function EditorCanvas({
     xs: [],
     ys: [],
   });
+  const [dragBlock, setDragBlock] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
 
   const size = workingCanvasSize(canvas);
   const editorCanvas: TemplateCanvas = {
@@ -68,6 +108,12 @@ export default function EditorCanvas({
     return () => ro.disconnect();
   }, [size.width]);
 
+  const dragGuides = useMemo<SpacingGuide[]>(() => {
+    if (!dragBlock || !showSpacing) return [];
+    return computeDragSpacingGuides(dragBlock.id, dragBlock.x, dragBlock.y, dragBlock.w, dragBlock.h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute when drag position or spacing toggle changes
+  }, [dragBlock, showSpacing, blocks]);
+
   function stagePoint(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -85,7 +131,10 @@ export default function EditorCanvas({
 
   function handleInteract(id: string | null) {
     setInteracting(id);
-    if (id === null) setGuides({ xs: [], ys: [] });
+    if (id === null) {
+      setGuides({ xs: [], ys: [] });
+      setDragBlock(null);
+    }
   }
 
   function snapMove(
@@ -102,6 +151,12 @@ export default function EditorCanvas({
       if (o.id === id) continue;
       candX.push(o.x, o.x + o.width / 2, o.x + o.width);
       candY.push(o.y, o.y + o.height / 2, o.y + o.height);
+    }
+    if (showGrid && gridSize > 0) {
+      const startX = Math.floor(x / gridSize) * gridSize;
+      const startY = Math.floor(y / gridSize) * gridSize;
+      for (let gx = startX; gx <= x + width; gx += gridSize) candX.push(gx);
+      for (let gy = startY; gy <= y + height; gy += gridSize) candY.push(gy);
     }
     const mineX = [x, x + width / 2, x + width];
     const mineY = [y, y + height / 2, y + height];
@@ -129,6 +184,140 @@ export default function EditorCanvas({
     return { x: x + (bx?.delta ?? 0), y: y + (by?.delta ?? 0) };
   }
 
+  function computeDragSpacingGuides(
+    id: string,
+    nx: number,
+    ny: number,
+    w: number,
+    h: number
+  ): SpacingGuide[] {
+    const MAX_DIST = 150;
+    const result: SpacingGuide[] = [];
+    const right = nx + w;
+    const bottom = ny + h;
+
+    let bestUp: { dist: number; y: number } | null = null;
+    let bestDown: { dist: number; y: number } | null = null;
+    let bestLeft: { dist: number; x: number } | null = null;
+    let bestRight: { dist: number; x: number } | null = null;
+
+    const edges = [
+      { x: 0, y: 0, w: size.width, h: 0 },
+      ...blocks.filter((b) => b.id !== id).map((b) => ({ x: b.x, y: b.y, w: b.width, h: b.height })),
+    ];
+    for (const e of edges) {
+      const eRight = e.x + e.w;
+      const eBottom = e.y + e.h;
+
+      if (eRight <= nx) {
+        const dist = nx - eRight;
+        if (dist <= MAX_DIST && (!bestLeft || dist < bestLeft.dist)) {
+          bestLeft = { dist, x: (eRight + nx) / 2 };
+        }
+      }
+      if (e.x >= right) {
+        const dist = e.x - right;
+        if (dist <= MAX_DIST && (!bestRight || dist < bestRight.dist)) {
+          bestRight = { dist, x: (right + e.x) / 2 };
+        }
+      }
+      if (eBottom <= ny) {
+        const dist = ny - eBottom;
+        if (dist <= MAX_DIST && (!bestUp || dist < bestUp.dist)) {
+          bestUp = { dist, y: (eBottom + ny) / 2 };
+        }
+      }
+      if (e.y >= bottom) {
+        const dist = e.y - bottom;
+        if (dist <= MAX_DIST && (!bestDown || dist < bestDown.dist)) {
+          bestDown = { dist, y: (bottom + e.y) / 2 };
+        }
+      }
+    }
+
+    if (bestLeft) {
+      result.push({ dir: "left", dist: bestLeft.dist, x: bestLeft.x, y1: ny, y2: bottom });
+    }
+    if (bestRight) {
+      result.push({ dir: "right", dist: bestRight.dist, x: bestRight.x, y1: ny, y2: bottom });
+    }
+    if (bestUp) {
+      result.push({ dir: "up", dist: bestUp.dist, y: bestUp.y, x1: nx, x2: right });
+    }
+    if (bestDown) {
+      result.push({ dir: "down", dist: bestDown.dist, y: bestDown.y, x1: nx, x2: right });
+    }
+
+    return result;
+  }
+
+  function computeSpacingOverlays(): { padding: PaddingOverlay[]; gaps: GapOverlay[] } {
+    const padding: PaddingOverlay[] = [];
+    const gaps: GapOverlay[] = [];
+
+    for (const b of blocks) {
+      const p = b.style.padding;
+      if (p > 0) {
+        padding.push({ x: b.x, y: b.y, w: b.width, h: b.height, pad: p });
+      }
+    }
+
+    const GAP_MAX = 150;
+    for (let i = 0; i < blocks.length; i++) {
+      for (let j = i + 1; j < blocks.length; j++) {
+        const a = blocks[i];
+        const b = blocks[j];
+        const aR = a.x + a.width;
+        const aB = a.y + a.height;
+        const bR = b.x + b.width;
+        const bB = b.y + b.height;
+
+        const overlapX = Math.max(0, Math.min(aR, bR) - Math.max(a.x, b.x));
+        const overlapY = Math.max(0, Math.min(aB, bB) - Math.max(a.y, b.y));
+
+        if (overlapY > 0) {
+          const gapLeft = b.x - aR;
+          const gapRight = a.x - bR;
+          if (gapLeft > 0 && gapLeft <= GAP_MAX) {
+            gaps.push({
+              x: aR, y: Math.max(a.y, b.y),
+              w: gapLeft, h: overlapY,
+              label: `${Math.round(gapLeft)}px`,
+            });
+          } else if (gapRight > 0 && gapRight <= GAP_MAX) {
+            gaps.push({
+              x: bR, y: Math.max(a.y, b.y),
+              w: gapRight, h: overlapY,
+              label: `${Math.round(gapRight)}px`,
+            });
+          }
+        }
+
+        if (overlapX > 0) {
+          const gapTop = b.y - aB;
+          const gapBottom = a.y - bB;
+          if (gapTop > 0 && gapTop <= GAP_MAX) {
+            gaps.push({
+              x: Math.max(a.x, b.x), y: aB,
+              w: overlapX, h: gapTop,
+              label: `${Math.round(gapTop)}px`,
+            });
+          } else if (gapBottom > 0 && gapBottom <= GAP_MAX) {
+            gaps.push({
+              x: Math.max(a.x, b.x), y: bB,
+              w: overlapX, h: gapBottom,
+              label: `${Math.round(gapBottom)}px`,
+            });
+          }
+        }
+      }
+    }
+
+    return { padding, gaps };
+  }
+
+  const spacingOverlays = showSpacing ? computeSpacingOverlays() : null;
+
   return (
     <div
       ref={paneRef}
@@ -143,7 +332,7 @@ export default function EditorCanvas({
             transformOrigin: "top left",
           }}
         >
-          <CanvasStage canvas={editorCanvas}>
+          <CanvasStage canvas={editorCanvas} showGrid={showGrid} gridSize={gridSize}>
             <div
               ref={stageRef}
               className="absolute inset-0"
@@ -151,6 +340,40 @@ export default function EditorCanvas({
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
             >
+              {spacingOverlays?.padding.map((p, i) => (
+                <span
+                  key={`pad${i}`}
+                  className="pointer-events-none absolute z-[1]"
+                  style={{
+                    left: p.x + p.pad,
+                    top: p.y + p.pad,
+                    width: Math.max(0, p.w - p.pad * 2),
+                    height: Math.max(0, p.h - p.pad * 2),
+                    backgroundColor: "rgba(59,130,246,0.12)",
+                    border: "1px dashed rgba(59,130,246,0.4)",
+                  }}
+                />
+              ))}
+              {spacingOverlays?.gaps.map((g, i) => (
+                <span
+                  key={`gap${i}`}
+                  className="pointer-events-none absolute z-[1] flex items-center justify-center"
+                  style={{
+                    left: g.x,
+                    top: g.y,
+                    width: g.w,
+                    height: g.h,
+                    backgroundColor: "rgba(249,115,22,0.15)",
+                  }}
+                >
+                  <span
+                    className="whitespace-nowrap rounded bg-orange-500 px-1 font-mono text-white"
+                    style={{ fontSize: 10, lineHeight: "14px" }}
+                  >
+                    {g.label}
+                  </span>
+                </span>
+              ))}
               {[...blocks]
                 .sort((a, b) => a.z - b.z)
                 .map((block) => (
@@ -167,6 +390,9 @@ export default function EditorCanvas({
                     onDelete={() => onDelete(block.id)}
                     snap={(x, y, width, height) =>
                       snapMove(block.id, x, y, width, height)
+                    }
+                    onDragPosition={(x, y, w, h) =>
+                      setDragBlock({ id: block.id, x, y, w, h })
                     }
                   />
                 ))}
@@ -196,6 +422,83 @@ export default function EditorCanvas({
                   }}
                 />
               ))}
+              {showSpacing && dragGuides.map((g, i) => {
+                const inv = 1 / scale;
+                if (g.dir === "left" || g.dir === "right") {
+                  return (
+                    <span
+                      key={`sg${i}`}
+                      className="pointer-events-none absolute z-20 flex flex-col items-center justify-center"
+                      style={{
+                        left: g.x! - 1,
+                        top: g.y1!,
+                        width: 2,
+                        height: g.y2! - g.y1!,
+                      }}
+                    >
+                      <span
+                        className="absolute"
+                        style={{
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          width: g.dist,
+                          height: 0,
+                          borderTop: "1px solid #3b82f6",
+                        }}
+                      />
+                      <span
+                        className="absolute whitespace-nowrap rounded bg-blue-500 px-1 font-mono text-white"
+                        style={{
+                          top: "50%",
+                          left: g.dist / 2,
+                          transform: "translate(-50%, -50%)",
+                          fontSize: 10 * inv,
+                          lineHeight: `${14 * inv}px`,
+                          paddingInline: 3 * inv,
+                        }}
+                      >
+                        {Math.round(g.dist)}px
+                      </span>
+                    </span>
+                  );
+                }
+                return (
+                  <span
+                    key={`sg${i}`}
+                    className="pointer-events-none absolute z-20 flex items-center justify-center"
+                    style={{
+                      top: g.y! - 1,
+                      left: g.x1!,
+                      height: 2,
+                      width: g.x2! - g.x1!,
+                    }}
+                  >
+                    <span
+                      className="absolute"
+                      style={{
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        height: g.dist,
+                        width: 0,
+                        borderLeft: "1px solid #3b82f6",
+                      }}
+                    />
+                    <span
+                      className="absolute whitespace-nowrap rounded bg-blue-500 px-1 font-mono text-white"
+                      style={{
+                        left: "50%",
+                        top: g.dist / 2,
+                        transform: "translate(-50%, -50%)",
+                        fontSize: 10 * inv,
+                        lineHeight: `${14 * inv}px`,
+                        paddingInline: 3 * inv,
+                      }}
+                    >
+                      {Math.round(g.dist)}px
+                    </span>
+                  </span>
+                );
+              })}
             </div>
           </CanvasStage>
         </div>
@@ -215,6 +518,7 @@ function BlockFrame({
   onInteract,
   onDelete,
   snap,
+  onDragPosition,
 }: {
   block: TemplateBlock;
   selected: boolean;
@@ -234,6 +538,7 @@ function BlockFrame({
     width: number,
     height: number
   ) => { x: number; y: number };
+  onDragPosition?: (x: number, y: number, w: number, h: number) => void;
 }) {
   const dragRef = useRef<{
     pointerId: number;
@@ -282,6 +587,7 @@ function BlockFrame({
         ? snap(raw.x, raw.y, block.width, block.height)
         : raw;
       onMove(block.id, snapped.x, snapped.y);
+      onDragPosition?.(snapped.x, snapped.y, block.width, block.height);
       return;
     }
     let x = orig.x;

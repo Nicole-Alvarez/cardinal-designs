@@ -10,6 +10,8 @@ function wrapperStyle(style: BlockStyle): React.CSSProperties {
     backgroundColor: style.backgroundColor === "transparent" ? undefined : style.backgroundColor,
     textAlign: style.textAlign,
     overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
     borderWidth: style.borderWidth > 0 ? style.borderWidth : undefined,
     borderStyle: style.borderWidth > 0 ? "solid" : undefined,
     borderColor: style.borderWidth > 0 ? style.borderColor : undefined,
