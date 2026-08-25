@@ -563,6 +563,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           </div>
 
           <CodeOutput
+            title={title}
             html={generated.html}
             reactCode={generated.react}
             angularCode={generated.angular}
