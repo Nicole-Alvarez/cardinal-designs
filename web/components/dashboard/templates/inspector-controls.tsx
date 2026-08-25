@@ -15,10 +15,12 @@ export function ColorInput({
   value,
   onChange,
   allowInherit = false,
+  allowTransparent = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   allowInherit?: boolean;
+  allowTransparent?: boolean;
 }) {
   if (allowInherit && value === "inherit") {
     return (
@@ -27,6 +29,21 @@ export function ColorInput({
         <button
           type="button"
           onClick={() => onChange("#000000")}
+          className="rounded-md border border-zinc-300 px-2 py-0.5 text-xs font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          Override
+        </button>
+      </div>
+    );
+  }
+
+  if (allowTransparent && value === "transparent") {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
+        <span className="text-xs text-zinc-400 dark:text-zinc-500">Transparent</span>
+        <button
+          type="button"
+          onClick={() => onChange("#ffffff")}
           className="rounded-md border border-zinc-300 px-2 py-0.5 text-xs font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
         >
           Override
@@ -57,6 +74,15 @@ export function ColorInput({
           className="text-xs text-zinc-400 underline-offset-2 transition-colors hover:text-zinc-600 hover:underline dark:text-zinc-500 dark:hover:text-zinc-300"
         >
           Use inherit
+        </button>
+      )}
+      {allowTransparent && (
+        <button
+          type="button"
+          onClick={() => onChange("transparent")}
+          className="text-xs text-zinc-400 underline-offset-2 transition-colors hover:text-zinc-600 hover:underline dark:text-zinc-500 dark:hover:text-zinc-300"
+        >
+          Use transparent
         </button>
       )}
     </div>

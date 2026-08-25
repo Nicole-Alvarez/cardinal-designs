@@ -389,6 +389,7 @@ export default function BlockInspector({
           <Field label="Background">
             <ColorInput
               value={block.style.backgroundColor}
+              allowTransparent
               onChange={(backgroundColor) => onStyleChange({ backgroundColor })}
             />
           </Field>
