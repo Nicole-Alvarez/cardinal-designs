@@ -3,12 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import BlockInspector from "@/components/dashboard/templates/block-inspector";
-import BlockPalette from "@/components/dashboard/templates/block-palette";
 import CanvasPanel from "@/components/dashboard/templates/canvas-panel";
 import CodeEditorPanel from "@/components/dashboard/templates/code-editor-panel";
 import CodeOutput from "@/components/dashboard/templates/code-output";
+import {
+  EditorIcon,
+  EditorTooltip,
+} from "@/components/dashboard/templates/editor-controls";
 import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
+import EditorCommands from "@/components/dashboard/templates/editor-commands";
 import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
+import TemplateEditorFooter from "@/components/dashboard/templates/template-editor-footer";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
 import {
@@ -31,7 +36,7 @@ import {
 } from "../types";
 import { getTemplate, updateTemplate } from "../queries";
 
-type PanelTab = "canvas" | "block";
+type PanelTab = "commands" | "canvas" | "block";
 type EditorMode = "wysiwyg" | "code";
 
 export default function TemplateEditorPage({ templateId }: { templateId: string }) {
@@ -423,152 +428,145 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/dashboard/templates"
-          className="text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+    <>
+      <div className="mx-auto flex h-[calc(100dvh-6.75rem)] w-full max-w-7xl flex-col gap-4 overflow-hidden md:h-[calc(100dvh-3rem)]">
+        {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
+        <header className="sticky top-0 z-40 shrink-0 overflow-visible rounded-2xl border border-zinc-200 bg-white/95 shadow-md backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div
+          role="toolbar"
+          aria-label="Template editor toolbar"
+          className="flex flex-wrap items-center gap-2 p-2.5"
         >
-          &larr; Templates
-        </Link>
-        <input
-          value={title}
-          onChange={(e) => handleRename(e.target.value)}
-          aria-label="Template title"
-          className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-xl font-semibold tracking-tight hover:border-zinc-300 focus:border-zinc-500 focus:outline-none dark:hover:border-zinc-700"
-        />
-        <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
-          {(["wysiwyg", "code"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={
-                "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors " +
-                (mode === m
-                  ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
-              }
+          <EditorTooltip label="Back to templates" align="left">
+            <Link
+              href="/dashboard/templates"
+              aria-label="Back to templates"
+              className="grid size-9 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
             >
-              {m === "wysiwyg" ? "WYSIWYG" : "Code"}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={handleSelectAll}
-          disabled={blocks.length === 0}
-          data-template-selection-preserving
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
-        >
-          {selectedIds.length === blocks.length && blocks.length > 0 ? "Clear selection" : "Select all"}
-        </button>
-        <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
-          <button
-            type="button"
-            onClick={handleUndo}
-            disabled={!history.canUndo}
-            aria-label="Undo"
-            title="Undo (⌘Z)"
-            className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:text-zinc-50"
-          >
-            ↶
-          </button>
-          <button
-            type="button"
-            onClick={handleRedo}
-            disabled={!history.canRedo}
-            aria-label="Redo"
-            title="Redo (⇧⌘Z)"
-            className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:text-zinc-50"
-          >
-            ↷
-          </button>
-        </div>
-        <div className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
-          <button
-            type="button"
-            onClick={() => setShowSpacing((prev) => !prev)}
-            aria-label="Toggle spacing overlay"
-            title="Spacing overlay (S)"
-            className={
-              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors " +
-              (showSpacing
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
+              <EditorIcon name="arrow-left" />
+            </Link>
+          </EditorTooltip>
+
+          <span className="hidden h-6 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
+
+          <input
+            value={title}
+            onChange={(e) => handleRename(e.target.value)}
+            aria-label="Template title"
+            className="min-w-48 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-lg font-semibold tracking-tight transition-colors hover:border-zinc-200 focus:border-zinc-300 focus:bg-white focus:outline-none dark:hover:border-zinc-700 dark:focus:border-zinc-600 dark:focus:bg-zinc-950"
+          />
+
+          <div className="flex items-center rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
+            {(["wysiwyg", "code"] as const).map((m) => {
+              const visualMode = m === "wysiwyg";
+              return (
+                <EditorTooltip
+                  key={m}
+                  label={visualMode ? "Visual editor" : "Code editor"}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setMode(m)}
+                    aria-pressed={mode === m}
+                    className={
+                      "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                      (mode === m
+                        ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-700 dark:text-white"
+                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")
+                    }
+                  >
+                    <EditorIcon name={visualMode ? "layout-template" : "code-2"} />
+                    {visualMode ? "WYSIWYG" : "Code"}
+                  </button>
+                </EditorTooltip>
+              );
+            })}
+          </div>
+
+          <span className="hidden h-6 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
+
+          <EditorTooltip
+            label={
+              selectedIds.length === blocks.length && blocks.length > 0
+                ? "Clear block selection"
+                : "Select all blocks"
             }
           >
-            SJ
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowGrid((prev) => !prev)}
-            aria-label="Toggle grid"
-            title="Show grid"
-            className={
-              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors " +
-              (showGrid
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
-            }
-          >
-            #
-          </button>
-          {showGrid && (
-            <input
-              type="number"
-              value={gridSize}
-              onChange={(e) => setGridSize(Math.max(4, Math.min(64, Number(e.target.value) || 8)))}
-              aria-label="Grid size in pixels"
-              title="Grid size (4-64px)"
-              className="w-12 rounded-md border border-zinc-300 bg-white px-1 py-0.5 text-center text-xs font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-              min={4}
-              max={64}
-            />
-          )}
-        </div>
-        {dirty && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
-            Unsaved changes
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
-      </div>
-
-      <p className="-mt-4 text-xs text-zinc-400 dark:text-zinc-500">
-        {savedAt ? `Last saved ${savedAt}` : "Not saved yet"}
-        {mode === "wysiwyg" &&
-          " · Drag to move, handles to resize, arrows to nudge, Delete to remove."}
-        {mode === "code" &&
-          " · Code mode saves the pasted HTML / React / Angular code; WYSIWYG blocks are kept untouched."}
-      </p>
-
-      {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-          {error}
-        </p>
-      )}
-
-      {mode === "wysiwyg" ? (
-        <>
-          <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)_17rem]">
-            <aside className="order-2 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:order-1">
-              <BlockPalette
-                onAdd={addBlockCentered}
-                onMetadata={() => setMetadataOpen(true)}
-                metadataCount={metadataFieldCount(previewMetadata)}
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              disabled={blocks.length === 0}
+              data-template-selection-preserving
+              aria-label={
+                selectedIds.length === blocks.length && blocks.length > 0
+                  ? "Clear block selection"
+                  : "Select all blocks"
+              }
+              className="grid size-9 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            >
+              <EditorIcon
+                name={
+                  selectedIds.length === blocks.length && blocks.length > 0
+                    ? "square-check"
+                    : "box-select"
+                }
               />
-            </aside>
+            </button>
+          </EditorTooltip>
 
-            <section className="order-1 min-h-96 lg:order-2">
+          <div className="flex items-center rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
+            <EditorTooltip label="Undo (⌘Z)">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={!history.canUndo}
+                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+              >
+                Undo
+              </button>
+            </EditorTooltip>
+            <EditorTooltip label="Redo (⇧⌘Z)">
+              <button
+                type="button"
+                onClick={handleRedo}
+                disabled={!history.canRedo}
+                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+              >
+                Redo
+              </button>
+            </EditorTooltip>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <EditorTooltip label={saving ? "Saving template" : "Save template"} align="right">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
+              >
+                <EditorIcon
+                  name={saving ? "loader-circle" : "save"}
+                  className={`size-4 ${saving ? "animate-spin" : ""}`}
+                />
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </EditorTooltip>
+          </div>
+        </div>
+        </header>
+
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-0.5 py-0.5 scroll-smooth">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+              {error}
+            </p>
+          )}
+
+          {mode === "wysiwyg" ? (
+            <>
+              <div className="grid gap-4 lg:h-[70vh] lg:grid-cols-4">
+            <section className="min-h-96 lg:col-span-3 lg:h-full lg:min-h-0">
               <EditorCanvas
                 canvas={canvas}
                 blocks={blocks}
@@ -579,67 +577,112 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 onAddAt={addBlockAt}
                 onDelete={handleDelete}
                 showSpacing={showSpacing}
+                onShowSpacingChange={setShowSpacing}
                 showGrid={showGrid}
+                onShowGridChange={setShowGrid}
                 gridSize={gridSize}
+                onGridSizeChange={setGridSize}
               />
             </section>
 
             <aside
               data-template-selection-preserving
-              className="order-3 h-fit rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="h-fit overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
             >
-              <div className="mb-4 grid grid-cols-2 gap-1">
-                {(["canvas", "block"] as const).map((tab) => (
+              <div
+                role="tablist"
+                aria-label="Editor panels"
+                className="grid shrink-0 grid-cols-3 gap-1 border-b border-zinc-100 bg-zinc-50/80 p-1.5 dark:border-zinc-800 dark:bg-zinc-950/40"
+              >
+                {(
+                  [
+                    { id: "commands", label: "Commands", icon: "command" },
+                    { id: "canvas", label: "Canvas", icon: "panels-top-left" },
+                    { id: "block", label: "Block", icon: "box" },
+                  ] as const
+                ).map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.id}
                     type="button"
-                    onClick={() => setPanelTab(tab)}
+                    role="tab"
+                    id={`editor-tab-${tab.id}`}
+                    aria-controls={`editor-panel-${tab.id}`}
+                    aria-selected={panelTab === tab.id}
+                    onClick={() => setPanelTab(tab.id)}
                     className={
-                      "rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors " +
-                      (panelTab === tab
-                        ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
+                      "flex min-w-0 flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                      (panelTab === tab.id
+                        ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
+                        : "text-zinc-400 hover:bg-white/70 hover:text-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200")
                     }
                   >
-                    {tab}
+                    <EditorIcon name={tab.icon} className="size-4" />
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
 
-              {panelTab === "canvas" ? (
-                <CanvasPanel canvas={canvas} onChange={patchCanvas} />
-              ) : (
-                <BlockInspector
-                  block={selectedBlock}
-                  selectedCount={selectedIds.length}
-                  onChange={patchSelected}
-                  onStyleChange={patchSelectedStyle}
-                  onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
-                />
-              )}
+              <div
+                role="tabpanel"
+                id={`editor-panel-${panelTab}`}
+                aria-labelledby={`editor-tab-${panelTab}`}
+                className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+              >
+                {panelTab === "commands" && (
+                  <EditorCommands
+                    onAdd={addBlockCentered}
+                    onMetadata={() => setMetadataOpen(true)}
+                    metadataCount={metadataFieldCount(previewMetadata)}
+                  />
+                )}
+                {panelTab === "canvas" && (
+                  <CanvasPanel canvas={canvas} onChange={patchCanvas} />
+                )}
+                {panelTab === "block" && (
+                  <BlockInspector
+                    block={selectedBlock}
+                    selectedCount={selectedIds.length}
+                    onChange={patchSelected}
+                    onStyleChange={patchSelectedStyle}
+                    onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
+                  />
+                )}
+              </div>
             </aside>
           </div>
 
-          <CodeOutput
-            title={title}
-            html={generated.html}
-            previewHtml={generated.previewHtml}
-            reactCode={generated.react}
-            angularCode={generated.angular}
-          />
-        </>
-      ) : (
-        <CodeEditorPanel
-          title={title}
+              <CodeOutput
+                title={title}
+                html={generated.html}
+                previewHtml={generated.previewHtml}
+                reactCode={generated.react}
+                angularCode={generated.angular}
+              />
+            </>
+          ) : (
+            <CodeEditorPanel
+              title={title}
+              lang={lang}
+              onLangChange={setLang}
+              code={codeBuffers[lang]}
+              onCodeChange={(value) => handleCodeChange(lang, value)}
+              metadata={previewMetadata}
+              onOpenMetadata={() => setMetadataOpen(true)}
+              onConvertToWysiwyg={handleConvertToWysiwyg}
+            />
+          )}
+        </div>
+
+        <TemplateEditorFooter
+          mode={mode}
           lang={lang}
-          onLangChange={setLang}
-          code={codeBuffers[lang]}
-          onCodeChange={(value) => handleCodeChange(lang, value)}
-          metadata={previewMetadata}
-          onOpenMetadata={() => setMetadataOpen(true)}
-          onConvertToWysiwyg={handleConvertToWysiwyg}
+          blockCount={blocks.length}
+          metadataRecordCount={previewMetadata.length}
+          dirty={dirty}
+          saving={saving}
+          savedAt={savedAt}
         />
-      )}
+      </div>
 
       <MetadataDialog
         open={metadataOpen}
@@ -648,6 +691,6 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         onClose={() => setMetadataOpen(false)}
         onSave={handleMetadataSave}
       />
-    </div>
+    </>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@/features/templates/types";
 import BlockPreview from "./block-preview";
 import CanvasStage from "./canvas-stage";
+import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 const MIN_SIZE = 16;
 const PANE_PADDING = 32;
@@ -59,8 +60,11 @@ interface EditorCanvasProps {
   onAddAt: (x: number, y: number) => void;
   onDelete: (id: string) => void;
   showSpacing?: boolean;
+  onShowSpacingChange?: (show: boolean) => void;
   showGrid?: boolean;
+  onShowGridChange?: (show: boolean) => void;
   gridSize?: number;
+  onGridSizeChange?: (size: number) => void;
 }
 
 export default function EditorCanvas({
@@ -73,8 +77,11 @@ export default function EditorCanvas({
   onAddAt,
   onDelete,
   showSpacing = false,
+  onShowSpacingChange,
   showGrid = false,
+  onShowGridChange,
   gridSize = 8,
+  onGridSizeChange,
 }: EditorCanvasProps) {
   const paneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -436,28 +443,91 @@ export default function EditorCanvas({
   const spacingOverlays = showSpacing ? computeSpacingOverlays() : null;
 
   return (
-    <div
-      ref={paneRef}
-      className="max-h-[70vh] overflow-auto rounded-2xl border bg-zinc-50 p-8 shadow-sm dark:bg-zinc-950/40"
-    >
-      <div className="mx-auto" style={{ width: size.width * scale }}>
-        <div
-          style={{
-            width: size.width,
-            height: size.height,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <CanvasStage canvas={editorCanvas} showGrid={showGrid} gridSize={gridSize}>
-            <div
-              ref={stageRef}
-              data-template-selection-preserving
-              className="absolute inset-0"
-              onPointerDown={() => onSelect(null)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-            >
+    <div className="relative lg:h-full">
+      <div
+        data-template-selection-preserving
+        role="toolbar"
+        aria-label="Canvas view controls"
+        className="absolute left-3 top-3 z-30 flex items-center gap-1 rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-md backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95"
+      >
+        <EditorTooltip label="Spacing overlay (S)" align="left">
+          <button
+            type="button"
+            onClick={() => onShowSpacingChange?.(!showSpacing)}
+            aria-label="Toggle spacing overlay"
+            aria-pressed={showSpacing}
+            className={
+              "grid size-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+              (showSpacing
+                ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-50 dark:text-zinc-950"
+                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white")
+            }
+          >
+            <EditorIcon name="ruler" />
+          </button>
+        </EditorTooltip>
+
+        <EditorTooltip label="Toggle grid">
+          <button
+            type="button"
+            onClick={() => onShowGridChange?.(!showGrid)}
+            aria-label="Toggle grid"
+            aria-pressed={showGrid}
+            className={
+              "grid size-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+              (showGrid
+                ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-50 dark:text-zinc-950"
+                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white")
+            }
+          >
+            <EditorIcon name="grid-3x3" />
+          </button>
+        </EditorTooltip>
+
+        {showGrid && (
+          <EditorTooltip label="Grid size in pixels" align="left">
+            <label className="flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+              <input
+                type="number"
+                value={gridSize}
+                onChange={(e) =>
+                  onGridSizeChange?.(
+                    Math.max(4, Math.min(64, Number(e.target.value) || 8))
+                  )
+                }
+                aria-label="Grid size in pixels"
+                className="w-7 bg-transparent text-right text-xs font-semibold text-zinc-800 outline-none dark:text-zinc-100"
+                min={4}
+                max={64}
+              />
+              px
+            </label>
+          </EditorTooltip>
+        )}
+      </div>
+
+      <div
+        ref={paneRef}
+        className="max-h-[70vh] overflow-auto rounded-2xl border bg-zinc-50 p-8 shadow-sm dark:bg-zinc-950/40 lg:h-full lg:max-h-none"
+      >
+        <div className="mx-auto" style={{ width: size.width * scale }}>
+          <div
+            style={{
+              width: size.width,
+              height: size.height,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <CanvasStage canvas={editorCanvas} showGrid={showGrid} gridSize={gridSize}>
+              <div
+                ref={stageRef}
+                data-template-selection-preserving
+                className="absolute inset-0"
+                onPointerDown={() => onSelect(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+              >
               {spacingOverlays?.padding.map((p, i) => (
                 <span
                   key={`pad${i}`}
@@ -562,8 +632,9 @@ export default function EditorCanvas({
                   palette={guidePalette}
                 />
               ))}
-            </div>
-          </CanvasStage>
+              </div>
+            </CanvasStage>
+          </div>
         </div>
       </div>
     </div>

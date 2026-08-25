@@ -68,10 +68,6 @@ export default function BlockInspector({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Block
-      </p>
-
       <Field label="Variant">
         <select
           value={block.type}

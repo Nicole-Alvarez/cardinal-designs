@@ -44,10 +44,6 @@ export default function CanvasPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Main block
-      </p>
-
       <Field label="Size presets">
         <select
           value={matchedPreset ? `${matchedPreset.width}x${matchedPreset.height}` : "custom"}

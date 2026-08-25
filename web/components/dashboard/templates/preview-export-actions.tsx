@@ -3,6 +3,7 @@
 import { useState, type RefObject } from "react";
 import { downloadUrl, previewImageFileName } from "@/features/templates/downloads";
 import { renderPreviewImage } from "@/features/templates/image-export";
+import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 export default function PreviewExportActions({
   title,
@@ -117,28 +118,69 @@ export default function PreviewExportActions({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={handlePrint}
-          disabled={exporting !== null}
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+    <div className="flex min-w-0 flex-col items-end gap-2">
+      <div className="flex items-center gap-1 rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
+        <EditorTooltip
+          label={exporting === "print" ? "Preparing print…" : "Print preview"}
+          align="right"
         >
-          {exporting === "print" ? "Preparing…" : "Print"}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownloadPng}
-          disabled={exporting !== null}
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={exporting !== null}
+            aria-label={exporting === "print" ? "Preparing print" : "Print preview"}
+            className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+          >
+            <EditorIcon
+              name={exporting === "print" ? "loader-circle" : "printer"}
+              className={`size-4 ${exporting === "print" ? "animate-spin" : ""}`}
+            />
+          </button>
+        </EditorTooltip>
+        <EditorTooltip
+          label={exporting === "png" ? "Exporting PNG…" : "Download preview as PNG"}
+          align="right"
         >
-          {exporting === "png" ? "Exporting…" : "Download PNG"}
-        </button>
+          <button
+            type="button"
+            onClick={handleDownloadPng}
+            disabled={exporting !== null}
+            aria-label={
+              exporting === "png" ? "Exporting preview as PNG" : "Download preview as PNG"
+            }
+            className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+          >
+            <EditorIcon
+              name={exporting === "png" ? "loader-circle" : "image-down"}
+              className={`size-4 ${exporting === "png" ? "animate-spin" : ""}`}
+            />
+          </button>
+        </EditorTooltip>
       </div>
-      {exportError && <p className="max-w-sm text-right text-xs text-red-600 dark:text-red-400">{exportError}</p>}
+      <span className="sr-only" aria-live="polite">
+        {exporting === "print"
+          ? "Preparing print preview"
+          : exporting === "png"
+            ? "Exporting preview as PNG"
+            : ""}
+      </span>
+      {exportError && (
+        <p
+          role="alert"
+          className="flex max-w-sm items-start gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-left text-xs text-red-600 dark:bg-red-950/60 dark:text-red-400"
+        >
+          <EditorIcon name="circle-alert" className="mt-0.5 size-3.5 shrink-0" />
+          {exportError}
+        </p>
+      )}
       {exportWarning && (
-        <p className="max-w-sm text-right text-xs text-amber-700 dark:text-amber-400">{exportWarning}</p>
+        <p
+          role="status"
+          className="flex max-w-sm items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-left text-xs text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+        >
+          <EditorIcon name="triangle-alert" className="mt-0.5 size-3.5 shrink-0" />
+          {exportWarning}
+        </p>
       )}
     </div>
   );

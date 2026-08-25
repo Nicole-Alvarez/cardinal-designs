@@ -2,9 +2,17 @@
 
 import { useRef, useState } from "react";
 import { codeFileName, downloadTextFile } from "@/features/templates/downloads";
+import { EditorIcon, EditorTooltip } from "./editor-controls";
 import PreviewExportActions from "./preview-export-actions";
 
 type Tab = "preview" | "html" | "react" | "angular";
+
+const OUTPUT_TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: "preview", label: "Preview", icon: "eye" },
+  { id: "html", label: "HTML", icon: "code-xml" },
+  { id: "react", label: "React", icon: "atom" },
+  { id: "angular", label: "Angular", icon: "triangle" },
+];
 
 export default function CodeOutput({
   title,
@@ -38,69 +46,109 @@ export default function CodeOutput({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-        <div className="flex flex-wrap gap-1">
-          {(["preview", "html", "react", "angular"] as const).map((t) => (
+    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex flex-wrap items-start gap-3 border-b border-zinc-200 bg-white/95 p-3 dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div className="flex h-9 shrink-0 items-center gap-2 px-1 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+          <span className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <EditorIcon name="file-code" />
+          </span>
+          Output
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Template output"
+          className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80"
+        >
+          {OUTPUT_TABS.map((outputTab) => (
             <button
-              key={t}
+              key={outputTab.id}
               type="button"
-              onClick={() => setTab(t)}
+              role="tab"
+              id={`output-tab-${outputTab.id}`}
+              aria-controls={`output-panel-${outputTab.id}`}
+              aria-selected={tab === outputTab.id}
+              onClick={() => setTab(outputTab.id)}
               className={
-                "rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors " +
-                (tab === t
-                  ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50")
+                "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                (tab === outputTab.id
+                  ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-700 dark:text-white"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")
               }
             >
-              {t}
+              <EditorIcon name={outputTab.icon} className="size-3.5" />
+              {outputTab.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-1">
+
+        <div className="ml-auto flex shrink-0 items-start">
           {tab === "preview" ? (
             <PreviewExportActions title={title} previewRef={previewRef} />
           ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadCode}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                Download file
-              </button>
-            </>
+            <div className="flex items-center gap-1 rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
+              <EditorTooltip label={copied ? "Copied" : `Copy ${tab} code`} align="right">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  aria-label={copied ? "Code copied" : `Copy ${tab} code`}
+                  className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                >
+                  <EditorIcon name={copied ? "check" : "copy"} />
+                </button>
+              </EditorTooltip>
+              <EditorTooltip label={`Download ${tab} file`} align="right">
+                <button
+                  type="button"
+                  onClick={handleDownloadCode}
+                  aria-label={`Download ${tab} file`}
+                  className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                >
+                  <EditorIcon name="file-down" />
+                </button>
+              </EditorTooltip>
+              <span className="sr-only" aria-live="polite">
+                {copied ? "Code copied to clipboard" : ""}
+              </span>
+            </div>
           )}
         </div>
       </div>
 
       {tab === "preview" ? (
-        <div className="max-h-[32rem] overflow-auto bg-zinc-50 p-4 dark:bg-zinc-950/40">
-          {/* Generated by our own codegen from editor inputs — all values escaped at generation time */}
-          <div ref={previewRef}>
-            <div data-template-preview-batch className="inline-flex flex-col gap-4 bg-white">
-              {previewHtml.map((preview, index) => (
-                <div
-                  key={index}
-                  data-template-preview-card
-                  dangerouslySetInnerHTML={{ __html: preview }}
-                />
-              ))}
+        <div
+          role="tabpanel"
+          id="output-panel-preview"
+          aria-labelledby="output-tab-preview"
+          className="max-h-[32rem] overflow-auto bg-zinc-100/70 p-5 dark:bg-zinc-950/50"
+        >
+          <div className="w-fit rounded-xl border border-zinc-200/80 bg-white/60 p-3 shadow-inner dark:border-zinc-800 dark:bg-zinc-900/50">
+            {/* Generated by our own codegen from editor inputs — all values escaped at generation time */}
+            <div ref={previewRef}>
+              <div data-template-preview-batch className="inline-flex flex-col gap-4 bg-white">
+                {previewHtml.map((preview, index) => (
+                  <div
+                    key={index}
+                    data-template-preview-card
+                    dangerouslySetInnerHTML={{ __html: preview }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
       ) : (
-        <pre className="max-h-96 overflow-auto p-4 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
-          <code>{code}</code>
-        </pre>
+        <div
+          role="tabpanel"
+          id={`output-panel-${tab}`}
+          aria-labelledby={`output-tab-${tab}`}
+          className="bg-zinc-950 p-2"
+        >
+          <pre className="max-h-[32rem] overflow-auto rounded-xl p-4 font-mono text-xs leading-relaxed text-zinc-300 selection:bg-blue-500/30">
+            <code>{code}</code>
+          </pre>
+        </div>
       )}
-    </div>
+    </section>
   );
 }
