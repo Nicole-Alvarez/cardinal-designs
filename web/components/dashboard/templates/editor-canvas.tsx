@@ -6,7 +6,9 @@ import {
   workingCanvasSize,
   type TemplateBlock,
   type TemplateCanvas,
+  type TemplateMetadata,
 } from "@/features/templates/types";
+import { resolveTemplateBlock } from "@/features/templates/metadata";
 import BlockPreview from "./block-preview";
 import CanvasStage from "./canvas-stage";
 
@@ -46,6 +48,7 @@ interface GapOverlay {
 interface EditorCanvasProps {
   canvas: TemplateCanvas;
   blocks: TemplateBlock[];
+  metadata: TemplateMetadata;
   selectedIds: string[];
   onSelect: (id: string | null, additive?: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
@@ -63,6 +66,7 @@ interface EditorCanvasProps {
 export default function EditorCanvas({
   canvas,
   blocks,
+  metadata,
   selectedIds,
   onSelect,
   onMove,
@@ -382,6 +386,7 @@ export default function EditorCanvas({
                   <BlockFrame
                     key={block.id}
                     block={block}
+                    previewBlock={resolveTemplateBlock(block, metadata)}
                     selected={selectedIds.includes(block.id)}
                     scale={scale}
                     interacting={interacting === block.id}
@@ -511,6 +516,7 @@ export default function EditorCanvas({
 
 function BlockFrame({
   block,
+  previewBlock,
   selected,
   scale,
   interacting,
@@ -523,6 +529,7 @@ function BlockFrame({
   onDragPosition,
 }: {
   block: TemplateBlock;
+  previewBlock: TemplateBlock;
   selected: boolean;
   scale: number;
   interacting: boolean;
@@ -641,7 +648,7 @@ function BlockFrame({
       onPointerCancel={endGesture}
       onDragStart={(e) => e.preventDefault()}
     >
-      <BlockPreview block={block} />
+      <BlockPreview block={previewBlock} />
 
       {selected && (
         <>

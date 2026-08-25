@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { TemplateBlock, TemplateCanvas } from "./types";
+import type { TemplateBlock, TemplateCanvas, TemplateMetadata } from "./types";
 
 export interface TemplateSnapshot {
   blocks: TemplateBlock[];
   canvas: TemplateCanvas;
   title: string;
+  metadata: TemplateMetadata;
 }
 
 const MAX_HISTORY = 50;

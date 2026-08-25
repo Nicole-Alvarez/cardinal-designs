@@ -8,8 +8,10 @@ import CanvasPanel from "@/components/dashboard/templates/canvas-panel";
 import CodeEditorPanel from "@/components/dashboard/templates/code-editor-panel";
 import CodeOutput from "@/components/dashboard/templates/code-output";
 import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
+import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
+import { detectTemplateFields } from "../metadata";
 import { useTemplateHistory, type TemplateSnapshot } from "../use-history";
 import {
   DEFAULT_CANVAS,
@@ -21,6 +23,7 @@ import {
   type Template,
   type TemplateBlock,
   type TemplateCanvas,
+  type TemplateMetadata,
 } from "../types";
 import { getTemplate, updateTemplate } from "../queries";
 
@@ -32,6 +35,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [title, setTitle] = useState("");
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
+  const [metadata, setMetadata] = useState<TemplateMetadata>({});
+  const [metadataOpen, setMetadataOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
   const [lang, setLang] = useState<CodeLang>("html");
@@ -49,11 +54,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const history = useTemplateHistory();
 
   useEffect(() => {
-    history.setCurrent({ blocks, canvas, title });
+    history.setCurrent({ blocks, canvas, title, metadata });
   });
 
   function snapshot(): TemplateSnapshot {
-    return { blocks, canvas, title };
+    return { blocks, canvas, title, metadata };
   }
 
   function checkpoint(tag: string) {
@@ -64,6 +69,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setBlocks(s.blocks);
     setCanvas(s.canvas);
     setTitle(s.title);
+    setMetadata(s.metadata);
     markDirty();
   }
 
@@ -88,6 +94,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         const parsed = parseContent(template.content);
         setCanvas(parsed.canvas);
         setBlocks(parsed.blocks);
+        setMetadata(parsed.metadata);
         setMode(template.isCode ? "code" : "wysiwyg");
         setCodeBuffers({
           html: template.html ?? "",
@@ -117,11 +124,16 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   const generated = useMemo(() => {
     return {
-      html: blocksToHtml(blocks, canvas),
-      react: blocksToReact(blocks, title || "Template", canvas),
-      angular: blocksToAngular(blocks, title || "Template", canvas),
+      html: blocksToHtml(blocks, canvas, metadata),
+      react: blocksToReact(blocks, title || "Template", canvas, metadata),
+      angular: blocksToAngular(blocks, title || "Template", canvas, metadata),
     };
-  }, [blocks, title, canvas]);
+  }, [blocks, title, canvas, metadata]);
+
+  const detectedMetadataPaths = useMemo(
+    () => detectTemplateFields(blocks, codeBuffers),
+    [blocks, codeBuffers]
+  );
 
   function markDirty() {
     setDirty(true);
@@ -309,7 +321,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest state each render
-  }, [mode, selectedId, selectedIds, blocks, canvas, title]);
+  }, [mode, selectedId, selectedIds, blocks, canvas, title, metadata]);
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
@@ -332,7 +344,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: false,
-          content: { version: 2, canvas, blocks },
+          content: { version: 3, canvas, blocks, metadata },
           html: generated.html,
           react: generated.react,
           angular: generated.angular,
@@ -341,6 +353,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: true,
+          content: { version: 3, canvas, blocks, metadata },
           [lang]: codeBuffers[lang] || null,
         });
       }
@@ -361,6 +374,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function handleCodeChange(langKey: CodeLang, value: string) {
     setCodeBuffers((prev) => ({ ...prev, [langKey]: value }));
+    markDirty();
+  }
+
+  function handleMetadataSave(nextMetadata: TemplateMetadata) {
+    checkpoint("metadata");
+    setMetadata(nextMetadata);
     markDirty();
   }
 
@@ -507,13 +526,18 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         <>
           <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)_17rem]">
             <aside className="order-2 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:order-1">
-              <BlockPalette onAdd={addBlockCentered} />
+              <BlockPalette
+                onAdd={addBlockCentered}
+                onMetadata={() => setMetadataOpen(true)}
+                metadataCount={Object.keys(metadata).length}
+              />
             </aside>
 
             <section className="order-1 min-h-96 lg:order-2">
               <EditorCanvas
                 canvas={canvas}
                 blocks={blocks}
+                metadata={metadata}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onMove={handleMove}
@@ -575,8 +599,18 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           onLangChange={setLang}
           code={codeBuffers[lang]}
           onCodeChange={(value) => handleCodeChange(lang, value)}
+          metadata={metadata}
+          onOpenMetadata={() => setMetadataOpen(true)}
         />
       )}
+
+      <MetadataDialog
+        open={metadataOpen}
+        metadata={metadata}
+        detectedPaths={detectedMetadataPaths}
+        onClose={() => setMetadataOpen(false)}
+        onSave={handleMetadataSave}
+      />
     </div>
   );
 }

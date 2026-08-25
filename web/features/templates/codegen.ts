@@ -1,8 +1,19 @@
-import type { TemplateBlock, TemplateCanvas } from "./types";
+import type {
+  TemplateBlock,
+  TemplateCanvas,
+  TemplateMetadata,
+  TemplateMetadataValue,
+} from "./types";
 import { htmlIconSvg, jsxIconSvg } from "./icons";
 import { googleFamiliesIn } from "./fonts";
 import { barcodeDataUri } from "./barcode";
 import { qrDataUri } from "./qr";
+import {
+  detectTemplateFields,
+  mergeDetectedMetadata,
+  metadataValue,
+  resolveTemplateBlock,
+} from "./metadata";
 
 const IND = "  ";
 
@@ -212,7 +223,11 @@ function blockLines(block: TemplateBlock, out: string[]): void {
   }
 }
 
-export function blocksToHtml(blocks: TemplateBlock[], canvas: TemplateCanvas): string {
+export function blocksToHtml(
+  blocks: TemplateBlock[],
+  canvas: TemplateCanvas,
+  metadata: TemplateMetadata = {}
+): string {
   const out: string[] = [];
   const fontLink = googleFontLink(blocks);
   if (fontLink) out.push(fontLink);
@@ -224,7 +239,7 @@ export function blocksToHtml(blocks: TemplateBlock[], canvas: TemplateCanvas): s
   }
 
   out.push(`${IND}<div style="${contentWrapperCss(canvas)}">`);
-  for (const block of byZ(blocks)) blockLines(block, out);
+  for (const block of byZ(blocks)) blockLines(resolveTemplateBlock(block, metadata), out);
   out.push(`${IND}</div>`);
 
   out.push("</div>");
@@ -253,7 +268,64 @@ function pascalIdentifier(title: string): string {
   return /^[0-9]/.test(ident) ? `T${ident}` : ident;
 }
 
-function reactBlockLines(block: TemplateBlock, out: string[], depth: number): void {
+function blockPlaceholderPaths(blocks: TemplateBlock[]): string[] {
+  return detectTemplateFields(blocks);
+}
+
+function tsType(value: TemplateMetadataValue): string {
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (value === null) return "unknown";
+  if (Array.isArray(value)) return "unknown[]";
+  const entries = Object.entries(value);
+  if (entries.length === 0) return "Record<string, unknown>";
+  return `{ ${entries.map(([key, child]) => `${JSON.stringify(key)}?: ${tsType(child)}`).join("; ")} }`;
+}
+
+function templateRoots(
+  blocks: TemplateBlock[],
+  metadata: TemplateMetadata
+): { name: string; value: TemplateMetadataValue }[] {
+  const paths = blockPlaceholderPaths(blocks);
+  const withDetected = mergeDetectedMetadata(metadata, paths);
+  return [...new Set(paths.map((path) => path.split(".")[0]))].map((name) => ({
+    name,
+    value: metadataValue(withDetected, name) ?? "",
+  }));
+}
+
+function reactChildren(value = ""): string {
+  const pattern = /{{\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*}}/g;
+  let cursor = 0;
+  let result = "";
+  for (const match of value.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    result += esc(value.slice(cursor, index));
+    result += `{${match[1]}}`;
+    cursor = index + match[0].length;
+  }
+  return result + esc(value.slice(cursor));
+}
+
+function reactAttribute(value: string): string {
+  const exact = value.match(/^{{\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*}}$/);
+  if (exact) return `{${exact[1]}}`;
+  if (!/{{\s*[A-Za-z_$]/.test(value)) return `"${esc(value)}"`;
+  const expression = value
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\$\{/g, "\\${")
+    .replace(/{{\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*}}/g, "${$1}");
+  return `{\`${expression}\`}`;
+}
+
+function reactBlockLines(
+  block: TemplateBlock,
+  out: string[],
+  depth: number,
+  metadata: TemplateMetadata
+): void {
   const pad = IND.repeat(depth);
   const pad2 = IND.repeat(depth + 1);
   const wrapper = reactStyleEntries(blockFrameCss(block));
@@ -262,7 +334,7 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
       const tag = `h${block.level ?? 2}`;
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       out.push(
-        `${pad2}<${tag} style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</${tag}>`
+        `${pad2}<${tag} style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${reactChildren(block.text)}</${tag}>`
       );
       out.push(`${pad}</div>`);
       break;
@@ -270,7 +342,7 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
     case "text": {
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       out.push(
-        `${pad2}<p style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</p>`
+        `${pad2}<p style={{ ${reactStyleEntries(blockInnerCss(block))} }}>${reactChildren(block.text)}</p>`
       );
       out.push(`${pad}</div>`);
       break;
@@ -278,7 +350,7 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
     case "button": {
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       out.push(
-        `${pad2}<a href="${esc(block.href ?? "#")}" style={{ display: "inline-block", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", ${reactStyleEntries(blockInnerCss(block))} }}>${esc(block.text ?? "")}</a>`
+        `${pad2}<a href=${reactAttribute(block.href ?? "#")} style={{ display: "inline-block", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", ${reactStyleEntries(blockInnerCss(block))} }}>${reactChildren(block.text)}</a>`
       );
       out.push(`${pad}</div>`);
       break;
@@ -286,7 +358,7 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
     case "image": {
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       out.push(
-        `${pad2}<img src="${esc(block.src || "")}" alt="${esc(block.alt || "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />`
+        `${pad2}<img src=${reactAttribute(block.src || "")} alt=${reactAttribute(block.alt || "")} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />`
       );
       out.push(`${pad}</div>`);
       break;
@@ -299,7 +371,8 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
       break;
     }
     case "qr": {
-      const src = qrDataUri(block.text);
+      const resolved = resolveTemplateBlock(block, metadata);
+      const src = qrDataUri(resolved.text);
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       if (src) {
         out.push(
@@ -312,11 +385,12 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
       break;
     }
     case "barcode": {
-      const src = barcodeDataUri(block.text);
+      const resolved = resolveTemplateBlock(block, metadata);
+      const src = barcodeDataUri(resolved.text);
       out.push(`${pad}<div style={{ ${wrapper} }}>`);
       if (src) {
         out.push(
-          `${pad2}<img src="${esc(src)}" alt="Barcode: ${esc(block.text ?? "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />`
+          `${pad2}<img src="${esc(src)}" alt="Barcode: ${esc(resolved.text ?? "")}" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />`
         );
       } else {
         out.push(`${pad2}<span>Enter barcode data</span>`);
@@ -342,14 +416,24 @@ function reactBlockLines(block: TemplateBlock, out: string[], depth: number): vo
 export function blocksToReact(
   blocks: TemplateBlock[],
   title: string,
-  canvas: TemplateCanvas
+  canvas: TemplateCanvas,
+  metadata: TemplateMetadata = {}
 ): string {
   const name = pascalIdentifier(title);
   const out: string[] = [];
+  const roots = templateRoots(blocks, metadata);
   const reactFontLink = googleFontLink(blocks);
   if (reactFontLink) out.push(reactFontLink, "");
+  if (roots.length > 0) {
+    out.push(`interface ${name}Props {`);
+    for (const root of roots) out.push(`${IND}${root.name}: ${tsType(root.value)};`);
+    out.push("}", "");
+  }
+  const params = roots.length > 0
+    ? `{ ${roots.map((root) => root.name).join(", ")} }: ${name}Props`
+    : "";
   out.push(
-    "export default function " + name + "() {",
+    `export default function ${name}(${params}) {`,
     `${IND}return (`,
     `${IND}${IND}<div style={{ ${reactStyleEntries(canvasRootCss(canvas))} }}>`
   );
@@ -363,7 +447,7 @@ export function blocksToReact(
 
   out.push(`${IND}${IND}${IND}<div style={{ ${reactStyleEntries(contentWrapperCss(canvas))} }}>`);
 
-  for (const block of byZ(blocks)) reactBlockLines(block, out, 5);
+  for (const block of byZ(blocks)) reactBlockLines(block, out, 5, metadata);
 
   out.push(`${IND}${IND}${IND}</div>`);
   out.push(`${IND}${IND}</div>`);
@@ -375,7 +459,8 @@ export function blocksToReact(
 export function blocksToAngular(
   blocks: TemplateBlock[],
   title: string,
-  canvas: TemplateCanvas
+  canvas: TemplateCanvas,
+  metadata: TemplateMetadata = {}
 ): string {
   const name = pascalIdentifier(title);
   const selector = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -396,7 +481,13 @@ export function blocksToAngular(
     ? `// Uses Google Fonts — add to your index.html:\n// ${angularFontLink}\n`
     : "";
 
-  return `${fontComment}import { Component } from "@angular/core";
+  const roots = templateRoots(blocks, metadata);
+  const angularImports = roots.length > 0 ? "Component, Input" : "Component";
+  const inputs = roots
+    .map((root) => `${IND}@Input({ required: true }) ${root.name}!: ${tsType(root.value)};`)
+    .join("\n");
+
+  return `${fontComment}import { ${angularImports} } from "@angular/core";
 
 @Component({
   selector: "app-${selector}",
@@ -405,6 +496,6 @@ export function blocksToAngular(
 ${body.join("\n")}
   \`,
 })
-export class ${name}Component {}
+export class ${name}Component {${inputs ? `\n${inputs}\n` : ""}}
 `;
 }

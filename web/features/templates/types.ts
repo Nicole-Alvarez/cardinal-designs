@@ -32,6 +32,16 @@ export type BlockType =
 
 export type CodeLang = "html" | "react" | "angular";
 
+export type TemplateMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | TemplateMetadataValue[]
+  | { [key: string]: TemplateMetadataValue };
+
+export type TemplateMetadata = Record<string, TemplateMetadataValue>;
+
 export function isSquareBlock(type: BlockType): boolean {
   return type === "icon" || type === "qr";
 }
@@ -107,9 +117,10 @@ export const AUTO_CANVAS_WIDTH = 480;
 export const AUTO_CANVAS_HEIGHT = 384;
 
 export interface TemplateContent {
-  version: 2;
+  version: 3;
   canvas: TemplateCanvas;
   blocks: TemplateBlock[];
+  metadata: TemplateMetadata;
 }
 
 function parsePx(value: unknown): number | null {
@@ -263,7 +274,7 @@ export function parseContent(raw: unknown): TemplateContent {
   if (Array.isArray(raw)) {
     const canvas = { ...DEFAULT_CANVAS };
     const { width } = workingCanvasSize(canvas);
-    return { version: 2, canvas, blocks: migrateLegacyBlocks(raw, width) };
+    return { version: 3, canvas, blocks: migrateLegacyBlocks(raw, width), metadata: {} };
   }
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
@@ -272,12 +283,16 @@ export function parseContent(raw: unknown): TemplateContent {
     const rawBlocks = Array.isArray(obj.blocks) ? (obj.blocks as Record<string, unknown>[]) : [];
     const isV2 = rawBlocks.length > 0 && rawBlocks.every(hasGeometry);
     return {
-      version: 2,
+      version: 3,
       canvas,
       blocks: isV2 ? rawBlocks.map((b, i) => normalizePositionedBlock(b, i)) : migrateLegacyBlocks(rawBlocks, width),
+      metadata:
+        obj.metadata && typeof obj.metadata === "object" && !Array.isArray(obj.metadata)
+          ? (obj.metadata as TemplateMetadata)
+          : {},
     };
   }
-  return { version: 2, canvas: { ...DEFAULT_CANVAS }, blocks: [] };
+  return { version: 3, canvas: { ...DEFAULT_CANVAS }, blocks: [], metadata: {} };
 }
 
 /** Factory for the universal block; every new block starts as a Text variant. */

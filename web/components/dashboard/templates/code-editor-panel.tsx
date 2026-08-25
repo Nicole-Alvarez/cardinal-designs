@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, type ComponentType } from "react";
-import type { CodeLang } from "@/features/templates/types";
+import React, { useEffect, useMemo, useState, type ComponentType } from "react";
+import { resolveTemplateString } from "@/features/templates/metadata";
+import type { CodeLang, TemplateMetadata } from "@/features/templates/types";
 
 const LANGS: { value: CodeLang; label: string }[] = [
   { value: "html", label: "HTML" },
@@ -14,12 +15,21 @@ export default function CodeEditorPanel({
   onLangChange,
   code,
   onCodeChange,
+  metadata,
+  onOpenMetadata,
 }: {
   lang: CodeLang;
   onLangChange: (lang: CodeLang) => void;
   code: string;
   onCodeChange: (value: string) => void;
+  metadata: TemplateMetadata;
+  onOpenMetadata: () => void;
 }) {
+  const previewCode = useMemo(
+    () => resolveTemplateString(code, metadata),
+    [code, metadata]
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -35,6 +45,14 @@ export default function CodeEditorPanel({
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={onOpenMetadata}
+          data-template-selection-preserving
+          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          Metadata ({Object.keys(metadata).length})
+        </button>
         <p className="text-xs text-zinc-400 dark:text-zinc-500">
           Paste your code — the preview below updates as you type.
         </p>
@@ -60,12 +78,12 @@ export default function CodeEditorPanel({
           <PreviewHeader label="Preview (HTML)" />
           <div className="max-h-[32rem] overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
             {/* Rendered from user-pasted HTML in this single-admin editor */}
-            <div dangerouslySetInnerHTML={{ __html: code }} />
+            <div dangerouslySetInnerHTML={{ __html: previewCode }} />
           </div>
         </section>
       )}
 
-      {lang === "react" && <ReactPreview code={code} />}
+      {lang === "react" && <ReactPreview code={previewCode} />}
 
       {lang === "angular" && (
         <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400">
