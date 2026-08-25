@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 const SESSION_COOKIE = "cardinal_session";
@@ -9,7 +10,7 @@ export interface SessionUser {
   role: string;
 }
 
-export async function getServerUser(): Promise<SessionUser | null> {
+export const getServerUser = cache(async function getServerUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -26,4 +27,4 @@ export async function getServerUser(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});

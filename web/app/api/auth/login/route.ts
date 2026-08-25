@@ -19,17 +19,20 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: res.status });
   }
 
-  const response = NextResponse.json(data);
-
-  if (data.token) {
-    response.cookies.set(SESSION_COOKIE, data.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: SESSION_TTL_SECONDS,
-    });
+  if (typeof data.token !== "string" || data.token.length === 0) {
+    return NextResponse.json({ error: "Login service returned no session" }, { status: 502 });
   }
+
+  const response = NextResponse.json({ user: data.user });
+  response.headers.set("Cache-Control", "no-store");
+  response.cookies.set(SESSION_COOKIE, data.token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_TTL_SECONDS,
+    priority: "high",
+  });
 
   return response;
 }
