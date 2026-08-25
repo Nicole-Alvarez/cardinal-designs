@@ -42,11 +42,11 @@ export function EditorTooltip({
         : "left-1/2 -translate-x-1/2";
 
   return (
-    <span className="group relative inline-flex">
+    <span className="group/tooltip relative inline-flex">
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none invisible absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${position}`}
+        className={`pointer-events-none invisible absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/tooltip:visible group-hover/tooltip:opacity-100 group-has-[:focus-visible]/tooltip:visible group-has-[:focus-visible]/tooltip:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${position}`}
       >
         {label}
       </span>

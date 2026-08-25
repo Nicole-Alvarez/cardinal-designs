@@ -33,13 +33,13 @@ export default function TemplatesTable({
           return (
             <article
               key={template.id}
-              className="group grid gap-4 px-4 py-4 transition-colors first:rounded-t-3xl last:rounded-b-3xl hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 md:grid-cols-[minmax(0,1fr)_12rem_12rem_5.5rem] md:items-center md:px-5"
+              className="group/row grid gap-4 px-4 py-4 transition-colors first:rounded-t-3xl last:rounded-b-3xl hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 md:grid-cols-[minmax(0,1fr)_12rem_12rem_5.5rem] md:items-center md:px-5"
             >
               <a
                 href={`/dashboard/templates/${template.id}`}
                 className="flex min-w-0 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 transition group-hover:border-violet-200 group-hover:bg-violet-50 group-hover:text-violet-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:group-hover:border-violet-900 dark:group-hover:bg-violet-950/60 dark:group-hover:text-violet-300">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 transition group-hover/row:border-violet-200 group-hover/row:bg-violet-50 group-hover/row:text-violet-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:group-hover/row:border-violet-900 dark:group-hover/row:bg-violet-950/60 dark:group-hover/row:text-violet-300">
                   <EditorIcon name="layout-template" className="size-4" />
                 </span>
                 <span className="min-w-0">
