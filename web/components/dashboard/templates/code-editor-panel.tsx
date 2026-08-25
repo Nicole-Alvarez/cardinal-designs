@@ -83,7 +83,7 @@ export default function CodeEditorPanel({
         </section>
       )}
 
-      {lang === "react" && <ReactPreview code={previewCode} />}
+      {lang === "react" && <ReactPreview code={previewCode} metadata={metadata} />}
 
       {lang === "angular" && (
         <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400">
@@ -103,9 +103,15 @@ function PreviewHeader({ label }: { label: string }) {
   );
 }
 
-function ReactPreview({ code }: { code: string }) {
+function ReactPreview({
+  code,
+  metadata,
+}: {
+  code: string;
+  metadata: TemplateMetadata;
+}) {
   const [state, setState] = useState<{
-    Component?: ComponentType;
+    Component?: ComponentType<Record<string, unknown>>;
     error?: string;
   }>({});
 
@@ -140,7 +146,7 @@ function ReactPreview({ code }: { code: string }) {
       ) : state.Component ? (
         <div className="max-h-[32rem] overflow-auto rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <ErrorBoundary onError={(message) => setState({ error: message })}>
-            <state.Component />
+            <state.Component {...metadata} />
           </ErrorBoundary>
         </div>
       ) : (
@@ -150,13 +156,15 @@ function ReactPreview({ code }: { code: string }) {
   );
 }
 
-async function compileReactComponent(source: string): Promise<ComponentType> {
+async function compileReactComponent(
+  source: string
+): Promise<ComponentType<Record<string, unknown>>> {
   const Babel = await import("@babel/standalone");
   const transformed = Babel.transform(source, {
     filename: "template.tsx",
     presets: [
-      ["react"],
-      ["typescript", { isTSX: true, allExtensions: true }],
+      ["react", { runtime: "classic" }],
+      ["typescript", { ignoreExtensions: true }],
     ],
     plugins: ["transform-modules-commonjs"],
   }).code;
@@ -164,7 +172,9 @@ async function compileReactComponent(source: string): Promise<ComponentType> {
     throw new Error("Compilation produced no output");
   }
 
-  const module_ = { exports: {} as { default?: ComponentType } };
+  const module_ = {
+    exports: {} as { default?: ComponentType<Record<string, unknown>> },
+  };
   new Function("module", "exports", "React", transformed)(
     module_,
     module_.exports,
