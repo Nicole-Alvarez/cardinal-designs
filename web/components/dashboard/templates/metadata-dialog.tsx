@@ -25,7 +25,9 @@ export default function MetadataDialog({
   onSave,
 }: MetadataDialogProps) {
   if (!open) return null;
-  const initialMetadata = mergeDetectedMetadata(metadata, detectedPaths);
+  const initialMetadata = metadata.length > 0
+    ? metadata
+    : mergeDetectedMetadata([], detectedPaths);
   return (
     <MetadataDialogContent
       key={JSON.stringify(initialMetadata)}
@@ -50,6 +52,7 @@ function MetadataDialogContent({
 }) {
   const [source, setSource] = useState(() => JSON.stringify(initialMetadata, null, 2));
   const [error, setError] = useState<string | null>(null);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,14 +69,19 @@ function MetadataDialogContent({
       setError(null);
       return parsed;
     } catch (err) {
+      setCheckResult(null);
       setError(err instanceof SyntaxError ? `Invalid JSON: ${err.message}` : (err as Error).message);
       return null;
     }
   }
 
-  function handleFormat() {
+  function handleCheck() {
     const parsed = parse();
-    if (parsed) setSource(JSON.stringify(parsed, null, 2));
+    if (parsed === null) return;
+    const fields = metadataFieldCount(parsed);
+    setCheckResult(
+      `Valid JSON · ${parsed.length} ${parsed.length === 1 ? "record" : "records"} · ${fields} ${fields === 1 ? "field" : "fields"}`
+    );
   }
 
   function handleSave() {
@@ -92,10 +100,11 @@ function MetadataDialogContent({
       const imported = file.name.toLowerCase().endsWith(".csv")
         ? parseMetadataCsv(contents)
         : parseMetadataJson(contents);
-      const merged = mergeDetectedMetadata(imported, detectedPaths);
-      setSource(JSON.stringify(merged, null, 2));
+      setSource(JSON.stringify(imported, null, 2));
       setError(null);
+      setCheckResult(null);
     } catch (err) {
+      setCheckResult(null);
       setError(`Could not import ${file.name}: ${(err as Error).message}`);
     }
   }
@@ -125,10 +134,13 @@ function MetadataDialogContent({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="metadata-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Template metadata
+              Preview metadata
             </h2>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               Each JSON object or CSV row renders one preview. Use values in blocks with {"{{field}}"}.
+            </p>
+            <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+              Preview metadata is temporary and is never saved with the template.
             </p>
           </div>
           <button
@@ -188,28 +200,37 @@ function MetadataDialogContent({
           onChange={(event) => {
             setSource(event.target.value);
             setError(null);
+            setCheckResult(null);
           }}
           rows={16}
           spellCheck={false}
           autoFocus
           className="mt-2 w-full rounded-xl border border-zinc-300 bg-white p-3 font-mono text-xs leading-relaxed text-zinc-800 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
         />
-        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          Extra fields are ignored. When a field is missing, its placeholder remains in the preview.
+        </p>
+        {error && <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {checkResult && (
+          <p aria-live="polite" className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            {checkResult}
+          </p>
+        )}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            onClick={handleFormat}
+            onClick={handleCheck}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            Format JSON
+            Check JSON
           </button>
           <button
             type="button"
             onClick={handleSave}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
-            Apply metadata
+            Apply to preview
           </button>
         </div>
       </section>

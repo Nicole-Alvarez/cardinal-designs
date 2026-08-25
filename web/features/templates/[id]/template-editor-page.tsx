@@ -13,7 +13,6 @@ import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
 import {
   detectTemplateFields,
-  firstMetadataRecord,
   metadataFieldCount,
 } from "../metadata";
 import { useTemplateHistory, type TemplateSnapshot } from "../use-history";
@@ -40,7 +39,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [title, setTitle] = useState("");
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
-  const [metadata, setMetadata] = useState<TemplateMetadata>([]);
+  const [previewMetadata, setPreviewMetadata] = useState<TemplateMetadata>([]);
   const [metadataOpen, setMetadataOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
@@ -59,11 +58,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const history = useTemplateHistory();
 
   useEffect(() => {
-    history.setCurrent({ blocks, canvas, title, metadata });
+    history.setCurrent({ blocks, canvas, title });
   });
 
   function snapshot(): TemplateSnapshot {
-    return { blocks, canvas, title, metadata };
+    return { blocks, canvas, title };
   }
 
   function checkpoint(tag: string) {
@@ -74,7 +73,6 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setBlocks(s.blocks);
     setCanvas(s.canvas);
     setTitle(s.title);
-    setMetadata(s.metadata);
     markDirty();
   }
 
@@ -99,7 +97,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         const parsed = parseContent(template.content);
         setCanvas(parsed.canvas);
         setBlocks(parsed.blocks);
-        setMetadata(parsed.metadata);
+        setPreviewMetadata([]);
         setMode(template.isCode ? "code" : "wysiwyg");
         setCodeBuffers({
           html: template.html ?? "",
@@ -128,16 +126,15 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
 
   const generated = useMemo(() => {
-    const firstRecord = firstMetadataRecord(metadata);
     return {
       html: blocksToHtml(blocks, canvas),
-      previewHtml: (metadata.length > 0 ? metadata : [{}]).map((record) =>
+      previewHtml: (previewMetadata.length > 0 ? previewMetadata : [{}]).map((record) =>
         blocksToHtml(blocks, canvas, record)
       ),
-      react: blocksToReact(blocks, title || "Template", canvas, firstRecord),
-      angular: blocksToAngular(blocks, title || "Template", canvas, firstRecord),
+      react: blocksToReact(blocks, title || "Template", canvas),
+      angular: blocksToAngular(blocks, title || "Template", canvas),
     };
-  }, [blocks, title, canvas, metadata]);
+  }, [blocks, title, canvas, previewMetadata]);
 
   const detectedMetadataPaths = useMemo(
     () => {
@@ -337,7 +334,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest state each render
-  }, [mode, selectedId, selectedIds, blocks, canvas, title, metadata]);
+  }, [mode, selectedId, selectedIds, blocks, canvas, title]);
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
@@ -360,7 +357,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: false,
-          content: { version: 4, canvas, blocks, metadata },
+          content: { version: 4, canvas, blocks, metadata: [] },
           html: generated.html,
           react: generated.react,
           angular: generated.angular,
@@ -369,7 +366,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: true,
-          content: { version: 4, canvas, blocks, metadata },
+          content: { version: 4, canvas, blocks, metadata: [] },
           [lang]: codeBuffers[lang] || null,
         });
       }
@@ -394,9 +391,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleMetadataSave(nextMetadata: TemplateMetadata) {
-    checkpoint("metadata");
-    setMetadata(nextMetadata);
-    markDirty();
+    setPreviewMetadata(nextMetadata);
   }
 
   async function handleConvertToWysiwyg() {
@@ -569,7 +564,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <BlockPalette
                 onAdd={addBlockCentered}
                 onMetadata={() => setMetadataOpen(true)}
-                metadataCount={metadataFieldCount(metadata)}
+                metadataCount={metadataFieldCount(previewMetadata)}
               />
             </aside>
 
@@ -640,7 +635,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           onLangChange={setLang}
           code={codeBuffers[lang]}
           onCodeChange={(value) => handleCodeChange(lang, value)}
-          metadata={metadata}
+          metadata={previewMetadata}
           onOpenMetadata={() => setMetadataOpen(true)}
           onConvertToWysiwyg={handleConvertToWysiwyg}
         />
@@ -648,7 +643,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
       <MetadataDialog
         open={metadataOpen}
-        metadata={metadata}
+        metadata={previewMetadata}
         detectedPaths={detectedMetadataPaths}
         onClose={() => setMetadataOpen(false)}
         onSave={handleMetadataSave}
