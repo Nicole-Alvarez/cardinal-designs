@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -11,10 +10,7 @@ export default function LogoutButton() {
   async function handleLogout() {
     setLoading(true);
     try {
-      await apiFetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch {
       // ignore — clear locally regardless
     }

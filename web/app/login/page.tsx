@@ -2,7 +2,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { apiFetch } from "@/lib/api";
 
 export default function LoginPage() {
   return (
@@ -28,11 +27,15 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      await apiFetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Login failed");
+      }
       router.replace(next);
       router.refresh();
     } catch (err) {

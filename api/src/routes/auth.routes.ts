@@ -17,7 +17,7 @@ router.post("/login", async (req: Request, res: Response) => {
       maxAge: config.sessionTtlMs,
     });
 
-    res.json({ user: result.user });
+    res.json({ token: result.token, user: result.user });
   } catch (err) {
     if (err instanceof AuthError) {
       return res.status(err.statusCode).json({ error: err.message });
