@@ -1,7 +1,7 @@
 import type {
   TemplateBlock,
   TemplateCanvas,
-  TemplateMetadata,
+  TemplateMetadataRecord,
   TemplateMetadataValue,
 } from "./types";
 import { htmlIconSvg, jsxIconSvg } from "./icons";
@@ -226,7 +226,7 @@ function blockLines(block: TemplateBlock, out: string[]): void {
 export function blocksToHtml(
   blocks: TemplateBlock[],
   canvas: TemplateCanvas,
-  metadata: TemplateMetadata = {}
+  metadata: TemplateMetadataRecord = {}
 ): string {
   const out: string[] = [];
   const fontLink = googleFontLink(blocks);
@@ -285,10 +285,10 @@ function tsType(value: TemplateMetadataValue): string {
 
 function templateRoots(
   blocks: TemplateBlock[],
-  metadata: TemplateMetadata
+  metadata: TemplateMetadataRecord
 ): { name: string; value: TemplateMetadataValue }[] {
   const paths = blockPlaceholderPaths(blocks);
-  const withDetected = mergeDetectedMetadata(metadata, paths);
+  const withDetected = mergeDetectedMetadata([metadata], paths)[0];
   return [...new Set(paths.map((path) => path.split(".")[0]))].map((name) => ({
     name,
     value: metadataValue(withDetected, name) ?? "",
@@ -324,7 +324,7 @@ function reactBlockLines(
   block: TemplateBlock,
   out: string[],
   depth: number,
-  metadata: TemplateMetadata
+  metadata: TemplateMetadataRecord
 ): void {
   const pad = IND.repeat(depth);
   const pad2 = IND.repeat(depth + 1);
@@ -417,7 +417,7 @@ export function blocksToReact(
   blocks: TemplateBlock[],
   title: string,
   canvas: TemplateCanvas,
-  metadata: TemplateMetadata = {}
+  metadata: TemplateMetadataRecord = {}
 ): string {
   const name = pascalIdentifier(title);
   const out: string[] = [];
@@ -460,7 +460,7 @@ export function blocksToAngular(
   blocks: TemplateBlock[],
   title: string,
   canvas: TemplateCanvas,
-  metadata: TemplateMetadata = {}
+  metadata: TemplateMetadataRecord = {}
 ): string {
   const name = pascalIdentifier(title);
   const selector = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();

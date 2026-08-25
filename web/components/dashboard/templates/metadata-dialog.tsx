@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  metadataFieldCount,
   mergeDetectedMetadata,
+  parseMetadataCsv,
   parseMetadataJson,
 } from "@/features/templates/metadata";
 import type { TemplateMetadata } from "@/features/templates/types";
@@ -48,6 +50,7 @@ function MetadataDialogContent({
 }) {
   const [source, setSource] = useState(() => JSON.stringify(initialMetadata, null, 2));
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -80,6 +83,30 @@ function MetadataDialogContent({
     onClose();
   }
 
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const contents = await file.text();
+      const imported = file.name.toLowerCase().endsWith(".csv")
+        ? parseMetadataCsv(contents)
+        : parseMetadataJson(contents);
+      const merged = mergeDetectedMetadata(imported, detectedPaths);
+      setSource(JSON.stringify(merged, null, 2));
+      setError(null);
+    } catch (err) {
+      setError(`Could not import ${file.name}: ${(err as Error).message}`);
+    }
+  }
+
+  let summary: TemplateMetadata | null = null;
+  try {
+    summary = parseMetadataJson(source);
+  } catch {
+    summary = null;
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4"
@@ -101,7 +128,7 @@ function MetadataDialogContent({
               Template metadata
             </h2>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Use values in blocks with {"{{field}}"} or nested paths such as {"{{customer.name}}"}.
+              Each JSON object or CSV row renders one preview. Use values in blocks with {"{{field}}"}.
             </p>
           </div>
           <button
@@ -129,9 +156,32 @@ function MetadataDialogContent({
           </div>
         )}
 
-        <label className="mt-4 block text-xs font-medium text-zinc-600 dark:text-zinc-300" htmlFor="template-metadata-json">
-          JSON object
-        </label>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300" htmlFor="template-metadata-json">
+            JSON records
+          </label>
+          <div className="flex items-center gap-2">
+            {summary && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {summary.length} {summary.length === 1 ? "record" : "records"} · {metadataFieldCount(summary)} fields
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Import JSON or CSV
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,.csv,application/json,text/csv"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </div>
+        </div>
         <textarea
           id="template-metadata-json"
           value={source}

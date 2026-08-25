@@ -40,7 +40,8 @@ export type TemplateMetadataValue =
   | TemplateMetadataValue[]
   | { [key: string]: TemplateMetadataValue };
 
-export type TemplateMetadata = Record<string, TemplateMetadataValue>;
+export type TemplateMetadataRecord = Record<string, TemplateMetadataValue>;
+export type TemplateMetadata = TemplateMetadataRecord[];
 
 export function isSquareBlock(type: BlockType): boolean {
   return type === "icon" || type === "qr";
@@ -117,7 +118,7 @@ export const AUTO_CANVAS_WIDTH = 480;
 export const AUTO_CANVAS_HEIGHT = 384;
 
 export interface TemplateContent {
-  version: 3;
+  version: 4;
   canvas: TemplateCanvas;
   blocks: TemplateBlock[];
   metadata: TemplateMetadata;
@@ -265,6 +266,17 @@ function normalizePositionedBlock(b: Record<string, unknown>, index: number): Te
   return migrated;
 }
 
+function isMetadataRecord(value: unknown): value is TemplateMetadataRecord {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeMetadataRecords(raw: unknown): TemplateMetadata {
+  if (Array.isArray(raw)) {
+    return raw.filter(isMetadataRecord).filter((record) => Object.keys(record).length > 0);
+  }
+  return isMetadataRecord(raw) && Object.keys(raw).length > 0 ? [raw] : [];
+}
+
 export function parseContent(raw: unknown): TemplateContent {
   const canvasOf = (obj: unknown): TemplateCanvas => ({
     ...DEFAULT_CANVAS,
@@ -274,7 +286,7 @@ export function parseContent(raw: unknown): TemplateContent {
   if (Array.isArray(raw)) {
     const canvas = { ...DEFAULT_CANVAS };
     const { width } = workingCanvasSize(canvas);
-    return { version: 3, canvas, blocks: migrateLegacyBlocks(raw, width), metadata: {} };
+    return { version: 4, canvas, blocks: migrateLegacyBlocks(raw, width), metadata: [] };
   }
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
@@ -283,16 +295,13 @@ export function parseContent(raw: unknown): TemplateContent {
     const rawBlocks = Array.isArray(obj.blocks) ? (obj.blocks as Record<string, unknown>[]) : [];
     const isV2 = rawBlocks.length > 0 && rawBlocks.every(hasGeometry);
     return {
-      version: 3,
+      version: 4,
       canvas,
       blocks: isV2 ? rawBlocks.map((b, i) => normalizePositionedBlock(b, i)) : migrateLegacyBlocks(rawBlocks, width),
-      metadata:
-        obj.metadata && typeof obj.metadata === "object" && !Array.isArray(obj.metadata)
-          ? (obj.metadata as TemplateMetadata)
-          : {},
+      metadata: normalizeMetadataRecords(obj.metadata),
     };
   }
-  return { version: 3, canvas: { ...DEFAULT_CANVAS }, blocks: [], metadata: {} };
+  return { version: 4, canvas: { ...DEFAULT_CANVAS }, blocks: [], metadata: [] };
 }
 
 /** Factory for the universal block; every new block starts as a Text variant. */

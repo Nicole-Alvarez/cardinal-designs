@@ -11,8 +11,13 @@ import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
 import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
-import { detectTemplateFields } from "../metadata";
+import {
+  detectTemplateFields,
+  firstMetadataRecord,
+  metadataFieldCount,
+} from "../metadata";
 import { useTemplateHistory, type TemplateSnapshot } from "../use-history";
+import { htmlCodeToWysiwyg, reactCodeToWysiwyg } from "../react-to-wysiwyg";
 import {
   DEFAULT_CANVAS,
   createUniversalBlock,
@@ -35,7 +40,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [title, setTitle] = useState("");
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
-  const [metadata, setMetadata] = useState<TemplateMetadata>({});
+  const [metadata, setMetadata] = useState<TemplateMetadata>([]);
   const [metadataOpen, setMetadataOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
@@ -123,16 +128,27 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
 
   const generated = useMemo(() => {
+    const firstRecord = firstMetadataRecord(metadata);
     return {
-      html: blocksToHtml(blocks, canvas, metadata),
-      react: blocksToReact(blocks, title || "Template", canvas, metadata),
-      angular: blocksToAngular(blocks, title || "Template", canvas, metadata),
+      html: blocksToHtml(blocks, canvas),
+      previewHtml: (metadata.length > 0 ? metadata : [{}]).map((record) =>
+        blocksToHtml(blocks, canvas, record)
+      ),
+      react: blocksToReact(blocks, title || "Template", canvas, firstRecord),
+      angular: blocksToAngular(blocks, title || "Template", canvas, firstRecord),
     };
   }, [blocks, title, canvas, metadata]);
 
   const detectedMetadataPaths = useMemo(
-    () => detectTemplateFields(blocks, codeBuffers),
-    [blocks, codeBuffers]
+    () => {
+      if (mode === "wysiwyg") return detectTemplateFields(blocks);
+      return detectTemplateFields([], {
+        html: lang === "html" ? codeBuffers.html : "",
+        react: lang === "react" ? codeBuffers.react : "",
+        angular: lang === "angular" ? codeBuffers.angular : "",
+      });
+    },
+    [mode, blocks, codeBuffers, lang]
   );
 
   function markDirty() {
@@ -344,7 +360,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: false,
-          content: { version: 3, canvas, blocks, metadata },
+          content: { version: 4, canvas, blocks, metadata },
           html: generated.html,
           react: generated.react,
           angular: generated.angular,
@@ -353,7 +369,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         updated = await updateTemplate(templateId, {
           title,
           isCode: true,
-          content: { version: 3, canvas, blocks, metadata },
+          content: { version: 4, canvas, blocks, metadata },
           [lang]: codeBuffers[lang] || null,
         });
       }
@@ -381,6 +397,30 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     checkpoint("metadata");
     setMetadata(nextMetadata);
     markDirty();
+  }
+
+  async function handleConvertToWysiwyg() {
+    setError(null);
+    try {
+      checkpoint("convert-code");
+      if (lang === "react") {
+        const converted = await reactCodeToWysiwyg(codeBuffers.react, blocks, canvas);
+        setCanvas(converted.canvas);
+        setBlocks(converted.blocks);
+      } else if (lang === "html") {
+        const converted = htmlCodeToWysiwyg(codeBuffers.html);
+        setCanvas(converted.canvas);
+        setBlocks(converted.blocks);
+      } else {
+        throw new Error("Angular conversion is not supported yet.");
+      }
+      setSelectedIds([]);
+      setPanelTab("canvas");
+      setMode("wysiwyg");
+      markDirty();
+    } catch (err) {
+      setError(`Could not convert to WYSIWYG: ${(err as Error).message}`);
+    }
   }
 
   if (loading) {
@@ -529,7 +569,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <BlockPalette
                 onAdd={addBlockCentered}
                 onMetadata={() => setMetadataOpen(true)}
-                metadataCount={Object.keys(metadata).length}
+                metadataCount={metadataFieldCount(metadata)}
               />
             </aside>
 
@@ -537,7 +577,6 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <EditorCanvas
                 canvas={canvas}
                 blocks={blocks}
-                metadata={metadata}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onMove={handleMove}
@@ -589,18 +628,21 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           <CodeOutput
             title={title}
             html={generated.html}
+            previewHtml={generated.previewHtml}
             reactCode={generated.react}
             angularCode={generated.angular}
           />
         </>
       ) : (
         <CodeEditorPanel
+          title={title}
           lang={lang}
           onLangChange={setLang}
           code={codeBuffers[lang]}
           onCodeChange={(value) => handleCodeChange(lang, value)}
           metadata={metadata}
           onOpenMetadata={() => setMetadataOpen(true)}
+          onConvertToWysiwyg={handleConvertToWysiwyg}
         />
       )}
 
