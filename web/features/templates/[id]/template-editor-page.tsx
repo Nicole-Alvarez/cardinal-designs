@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import BlockInspector from "@/components/dashboard/templates/block-inspector";
 import CanvasPanel from "@/components/dashboard/templates/canvas-panel";
 import CodeEditorPanel from "@/components/dashboard/templates/code-editor-panel";
 import CodeOutput from "@/components/dashboard/templates/code-output";
+import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
 import {
   EditorIcon,
   EditorTooltip,
@@ -14,6 +15,8 @@ import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
 import EditorCommands from "@/components/dashboard/templates/editor-commands";
 import { DraftTextInput } from "@/components/dashboard/templates/draft-inputs";
 import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
+import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
+import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
 import TemplateEditorFooter from "@/components/dashboard/templates/template-editor-footer";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
@@ -35,12 +38,19 @@ import {
   workingCanvasSize,
   type BlockStyle,
   type CodeLang,
-  type Template,
+  type CanvasSummary,
   type TemplateBlock,
   type TemplateCanvas,
   type TemplateMetadata,
 } from "../types";
 import { getTemplate, updateTemplate } from "../queries";
+import {
+  listCanvases,
+  getCanvas,
+  createCanvas,
+  updateCanvas,
+  deleteCanvas,
+} from "../canvas-queries";
 
 type PanelTab = "commands" | "canvas" | "block";
 type EditorMode = "wysiwyg" | "code";
@@ -49,10 +59,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [mode, setMode] = useState<EditorMode>("wysiwyg");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(true);
+  const [canvases, setCanvases] = useState<CanvasSummary[]>([]);
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
   const [previewMetadata, setPreviewMetadata] = useState<TemplateMetadata>([]);
   const [metadataOpen, setMetadataOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
   const [lang, setLang] = useState<CodeLang>("html");
@@ -67,6 +81,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [showSpacing, setShowSpacing] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(8);
+  const [deleteCanvasOpen, setDeleteCanvasOpen] = useState(false);
+  const [deleteCanvasTarget, setDeleteCanvasTarget] = useState<string | null>(null);
+  const [creatingCanvas, setCreatingCanvas] = useState(false);
   const history = useTemplateHistory();
   const codeHistory = useCodeHistory();
 
@@ -125,40 +142,49 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     if (snapshot) applySnapshot(snapshot);
   }
 
+  const loadCanvasContent = useCallback(async (templateId: string, canvasId: string) => {
+    const c = await getCanvas(templateId, canvasId);
+    const parsed = parseContent(c.content);
+    setCanvas(parsed.canvas);
+    setBlocks(parsed.blocks);
+    setCodeBuffers({
+      html: c.html ?? "",
+      react: c.react ?? "",
+      angular: c.angular ?? "",
+    });
+    setLang(
+      c.html ? "html" : c.react ? "react" : c.angular ? "angular" : "html"
+    );
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    getTemplate(templateId)
-      .then((template) => {
+    (async () => {
+      try {
+        const template = await getTemplate(templateId);
         if (cancelled) return;
         setTitle(template.title);
         setDescription(template.description);
-        const parsed = parseContent(template.content);
-        setCanvas(parsed.canvas);
-        setBlocks(parsed.blocks);
-        setPreviewMetadata([]);
+        setIsPrivate(template.isPrivate);
         setMode(template.isCode ? "code" : "wysiwyg");
-        setCodeBuffers({
-          html: template.html ?? "",
-          react: template.react ?? "",
-          angular: template.angular ?? "",
-        });
-        setLang(
-          template.isCode
-            ? template.html
-              ? "html"
-              : template.react
-                ? "react"
-                : "angular"
-            : "html"
-        );
-        setSavedAt(new Date(template.updatedAt).toLocaleString());
-      })
-      .catch((err: Error) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [templateId]);
+
+        const canvasList = await listCanvases(templateId);
+        if (cancelled) return;
+        setCanvases(canvasList);
+
+        if (canvasList.length > 0) {
+          const first = canvasList[0];
+          setActiveCanvasId(first.id);
+          await loadCanvasContent(templateId, first.id);
+        }
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [templateId, loadCanvasContent]);
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
@@ -404,31 +430,23 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }, [selectedIds.length]);
 
   async function handleSave() {
+    if (!activeCanvasId) return;
     setSaving(true);
     setError(null);
     try {
-      let updated: Template;
-      if (mode === "wysiwyg") {
-        updated = await updateTemplate(templateId, {
-          title,
-          description,
-          isCode: false,
-          content: { version: 4, canvas, blocks, metadata: [] },
-          html: generated.html,
-          react: generated.react,
-          angular: generated.angular,
-        });
-      } else {
-        updated = await updateTemplate(templateId, {
-          title,
-          description,
-          isCode: true,
-          content: { version: 4, canvas, blocks, metadata: [] },
-          [lang]: codeBuffers[lang] || null,
-        });
-      }
-      setSavedAt(new Date(updated.updatedAt).toLocaleString());
-      setDescription(updated.description);
+      await updateCanvas(templateId, activeCanvasId, {
+        content: { version: 4, canvas, blocks, metadata: [] },
+        html: generated.html,
+        react: generated.react,
+        angular: generated.angular,
+      });
+      await updateTemplate(templateId, {
+        title,
+        description,
+        isPrivate,
+        isCode: mode === "code",
+      });
+      setSavedAt(new Date().toLocaleString());
       setDirty(false);
     } catch (err) {
       setError((err as Error).message);
@@ -485,6 +503,92 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     }
   }
 
+  async function handleAddCanvas() {
+    if (creatingCanvas) return;
+    setCreatingCanvas(true);
+    try {
+      const newCanvas = await createCanvas(templateId);
+      setCanvases((prev) => [...prev, newCanvas]);
+      await handleSwitchCanvas(newCanvas.id);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCreatingCanvas(false);
+    }
+  }
+
+  async function handleSwitchCanvas(canvasId: string) {
+    if (canvasId === activeCanvasId) return;
+
+    if (activeCanvasId && dirty) {
+      try {
+        await updateCanvas(templateId, activeCanvasId, {
+          content: { version: 4, canvas, blocks, metadata: [] },
+          html: generated.html,
+          react: generated.react,
+          angular: generated.angular,
+        });
+      } catch (err) {
+        setError((err as Error).message);
+        return;
+      }
+    }
+
+    try {
+      await loadCanvasContent(templateId, canvasId);
+      setActiveCanvasId(canvasId);
+      setSelectedIds([]);
+      setPanelTab("canvas");
+      setDirty(false);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function handleRenameCanvas(canvasId: string, newTitle: string) {
+    setCanvases((prev) =>
+      prev.map((c) => (c.id === canvasId ? { ...c, title: newTitle } : c))
+    );
+    updateCanvas(templateId, canvasId, { title: newTitle }).catch((err) => {
+      setError((err as Error).message);
+    });
+  }
+
+  function handleDeleteCanvasRequest(canvasId: string) {
+    setDeleteCanvasTarget(canvasId);
+    setDeleteCanvasOpen(true);
+  }
+
+  async function confirmDeleteCanvas() {
+    if (!deleteCanvasTarget) return;
+    try {
+      await deleteCanvas(templateId, deleteCanvasTarget);
+      const remaining = canvases.filter((c) => c.id !== deleteCanvasTarget);
+      setCanvases(remaining);
+
+      if (activeCanvasId === deleteCanvasTarget && remaining.length > 0) {
+        await handleSwitchCanvas(remaining[0].id);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeleteCanvasOpen(false);
+      setDeleteCanvasTarget(null);
+    }
+  }
+
+  async function handleSettingsSave(patch: { title: string; description: string; isPrivate: boolean }) {
+    try {
+      await updateTemplate(templateId, patch);
+      setTitle(patch.title);
+      setDescription(patch.description);
+      setIsPrivate(patch.isPrivate);
+      setSettingsOpen(false);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading...</p>;
   }
@@ -528,6 +632,18 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 className="block w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-zinc-500 transition-colors placeholder:text-zinc-400 hover:border-zinc-200 focus-visible:border-zinc-300 focus-visible:bg-white focus-visible:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-zinc-400 dark:placeholder:text-zinc-500 dark:hover:border-zinc-700 dark:focus-visible:border-zinc-600 dark:focus-visible:bg-zinc-950 dark:focus-visible:text-zinc-200"
               />
             </div>
+
+            {canvases.length > 0 && activeCanvasId && (
+              <CanvasSelector
+                canvases={canvases}
+                activeCanvasId={activeCanvasId}
+                addingCanvas={creatingCanvas}
+                onSelect={handleSwitchCanvas}
+                onAdd={handleAddCanvas}
+                onRename={handleRenameCanvas}
+                onDelete={handleDeleteCanvasRequest}
+              />
+            )}
 
           <div className="flex items-center rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
             {(["wysiwyg", "code"] as const).map((m) => {
@@ -707,8 +823,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 {panelTab === "commands" && (
                   <EditorCommands
                     onAdd={addBlockCentered}
+                    onAddCanvas={handleAddCanvas}
+                    onSettings={() => setSettingsOpen(true)}
                     onMetadata={() => setMetadataOpen(true)}
                     metadataCount={metadataFieldCount(previewMetadata)}
+                    addingCanvas={creatingCanvas}
                   />
                 )}
                 {panelTab === "canvas" && (
@@ -766,6 +885,28 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         detectedPaths={detectedMetadataPaths}
         onClose={() => setMetadataOpen(false)}
         onSave={handleMetadataSave}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        title={title}
+        description={description}
+        isPrivate={isPrivate}
+        onClose={() => setSettingsOpen(false)}
+        onSave={handleSettingsSave}
+      />
+
+      <ConfirmDialog
+        open={deleteCanvasOpen}
+        title="Delete canvas?"
+        description="Are you sure you want to delete this canvas? This action cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteCanvas}
+        onCancel={() => {
+          setDeleteCanvasOpen(false);
+          setDeleteCanvasTarget(null);
+        }}
       />
     </>
   );

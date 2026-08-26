@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import authRoutes from "./auth.routes";
+import canvasRoutes from "./canvas.routes";
 import templateRoutes from "./template.routes";
 import uploadsRoutes from "./uploads.routes";
 
@@ -11,6 +12,7 @@ router.get("/health", (_req: Request, res: Response) => {
 
 router.use("/auth", authRoutes);
 router.use("/templates", templateRoutes);
+router.use("/templates/:templateId/canvases", canvasRoutes);
 router.use("/uploads", uploadsRoutes);
 
 export default router;

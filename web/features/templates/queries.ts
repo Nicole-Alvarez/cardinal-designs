@@ -24,10 +24,7 @@ export async function createTemplate(): Promise<Template> {
 export interface UpdateTemplateInput {
   title?: string;
   description?: string;
-  content?: unknown;
-  html?: string | null;
-  react?: string | null;
-  angular?: string | null;
+  isPrivate?: boolean;
   isCode?: boolean;
 }
 

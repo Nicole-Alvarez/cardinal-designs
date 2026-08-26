@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EditorIcon } from "@/components/dashboard/templates/editor-controls";
 import TemplatesTable from "@/components/dashboard/templates/templates-table";
+import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
 import {
   createTemplate,
   deleteTemplate,
@@ -17,6 +18,8 @@ export default function TemplatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     listTemplates()
@@ -36,16 +39,25 @@ export default function TemplatesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    setDeletingId(id);
+  function handleDeleteRequest(id: string) {
+    const template = templates?.find((t) => t.id === id);
+    setDeleteTarget({ id, title: template?.title ?? "this template" });
+    setDeleteConfirmOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
     setError(null);
+    setDeleteConfirmOpen(false);
     try {
-      await deleteTemplate(id);
-      setTemplates((prev) => prev?.filter((t) => t.id !== id) ?? null);
+      await deleteTemplate(deleteTarget.id);
+      setTemplates((prev) => prev?.filter((t) => t.id !== deleteTarget.id) ?? null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setDeletingId(null);
+      setDeleteTarget(null);
     }
   }
 
@@ -149,9 +161,38 @@ export default function TemplatesPage() {
       ) : (
         <TemplatesTable
           templates={templates}
-          onDelete={handleDelete}
+          onDelete={handleDeleteRequest}
           deletingId={deletingId}
         />
+      )}
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete template?"
+        description={`Are you sure you want to delete "${deleteTarget?.title}"? This will also delete all canvases. This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
+        loading={deletingId !== null}
+      />
+
+      {creating && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-zinc-950/70"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-8 py-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+            <EditorIcon name="loader-circle" className="size-6 animate-spin text-zinc-500 dark:text-zinc-400" />
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Creating your template...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

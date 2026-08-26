@@ -15,8 +15,9 @@ export default function TemplatesTable({
       aria-label="Templates"
       className="rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <div className="hidden grid-cols-[minmax(0,1fr)_12rem_12rem_5.5rem] items-center gap-4 border-b border-zinc-200 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500 md:grid">
+      <div className="hidden grid-cols-[minmax(0,1fr)_8rem_12rem_12rem_5.5rem] items-center gap-4 border-b border-zinc-200 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500 md:grid">
         <span>Template</span>
+        <span>Visibility</span>
         <span>Last updated</span>
         <span>Created</span>
         <span className="text-right">Actions</span>
@@ -29,7 +30,7 @@ export default function TemplatesTable({
           return (
             <article
               key={template.id}
-              className="group/row grid gap-4 px-4 py-4 transition-colors first:rounded-t-3xl last:rounded-b-3xl hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 md:grid-cols-[minmax(0,1fr)_12rem_12rem_5.5rem] md:items-center md:px-5"
+              className="group/row grid gap-4 px-4 py-4 transition-colors first:rounded-t-3xl last:rounded-b-3xl hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 md:grid-cols-[minmax(0,1fr)_8rem_12rem_12rem_5.5rem] md:items-center md:px-5"
             >
               <a
                 href={`/dashboard/templates/${template.id}`}
@@ -50,6 +51,22 @@ export default function TemplatesTable({
                   </span>
                 </span>
               </a>
+
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    template.isPrivate
+                      ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                  }`}
+                >
+                  <EditorIcon
+                    name={template.isPrivate ? "lock" : "globe"}
+                    className="size-3"
+                  />
+                  {template.isPrivate ? "Private" : "Public"}
+                </span>
+              </div>
 
               <TemplateDate
                 label="Last updated"

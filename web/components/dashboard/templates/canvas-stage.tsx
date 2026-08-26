@@ -24,7 +24,6 @@ export default function CanvasStage({
     minHeight: canvas.height === "auto" ? "384px" : undefined,
     color: canvas.textColor,
     boxSizing: "border-box",
-    maxWidth: "100%",
     marginInline: canvas.width === "auto" ? undefined : "auto",
   };
   const contentStyle: CSSProperties = {

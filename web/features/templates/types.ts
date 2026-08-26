@@ -4,16 +4,28 @@ export interface TemplateSummary {
   id: string;
   title: string;
   description: string;
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Template extends TemplateSummary {
+  isCode: boolean;
+}
+
+export interface CanvasSummary {
+  id: string;
+  title: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Canvas extends CanvasSummary {
   content: TemplateContent | null;
   html: string | null;
   react: string | null;
   angular: string | null;
-  isCode: boolean;
 }
 
 /**

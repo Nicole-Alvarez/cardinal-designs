@@ -8,15 +8,44 @@ import { EditorIcon } from "./editor-controls";
 
 export default function EditorCommands({
   onAdd,
+  onAddCanvas,
+  onSettings,
   onMetadata,
   metadataCount,
+  addingCanvas = false,
 }: {
   onAdd: () => void;
+  onAddCanvas: () => void;
+  onSettings: () => void;
   onMetadata: () => void;
   metadataCount: number;
+  addingCanvas?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
+      <button
+        type="button"
+        onClick={onAddCanvas}
+        disabled={addingCanvas}
+        className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2.5 text-left transition-colors hover:border-zinc-200 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-60 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/70"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-300">
+          <EditorIcon
+            name={addingCanvas ? "loader-circle" : "layers-2"}
+            className={addingCanvas ? "animate-spin" : ""}
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+            {addingCanvas ? "Adding canvas..." : "Add canvas"}
+            {!addingCanvas && <EditorIcon name="plus" className="size-3.5" />}
+          </span>
+          <span className="block text-[11px] leading-4 text-zinc-400 dark:text-zinc-500">
+            Add front or back side
+          </span>
+        </span>
+      </button>
+
       <button
         type="button"
         draggable
@@ -63,6 +92,24 @@ export default function EditorCommands({
           </span>
           <span className="block text-[11px] leading-4 text-zinc-400 dark:text-zinc-500">
             Preview dynamic data
+          </span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onSettings}
+        className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2.5 text-left transition-colors hover:border-zinc-200 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/70"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <EditorIcon name="settings" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+            Settings
+          </span>
+          <span className="block text-[11px] leading-4 text-zinc-400 dark:text-zinc-500">
+            Privacy, description
           </span>
         </span>
       </button>

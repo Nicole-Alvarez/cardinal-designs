@@ -9,10 +9,7 @@ const publicColumns = {
   id: true,
   title: true,
   description: true,
-  content: true,
-  html: true,
-  react: true,
-  angular: true,
+  isPrivate: true,
   isCode: true,
   createdAt: true,
   updatedAt: true,
@@ -28,6 +25,7 @@ export interface TemplateSummary {
   id: string;
   title: string;
   description: string;
+  isPrivate: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +37,7 @@ export async function list(userId: string): Promise<TemplateSummary[]> {
       id: true,
       title: true,
       description: true,
+      isPrivate: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -60,11 +59,18 @@ export async function getById(id: string, userId: string): Promise<Template> {
 export async function create(userId: string): Promise<Template> {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
+      const title = `Untitled-${randomSuffix()}`;
       return await prisma.template.create({
         data: {
           userId,
-          title: `Untitled-${randomSuffix()}`,
+          title,
           description: "",
+          canvases: {
+            create: {
+              title,
+              position: 0,
+            },
+          },
         },
         select: publicColumns,
       });
@@ -83,10 +89,7 @@ export async function create(userId: string): Promise<Template> {
 export interface UpdateTemplateInput {
   title?: unknown;
   description?: unknown;
-  content?: unknown;
-  html?: unknown;
-  react?: unknown;
-  angular?: unknown;
+  isPrivate?: unknown;
   isCode?: unknown;
 }
 
@@ -117,17 +120,11 @@ export async function update(
   if (input.description !== undefined) {
     data.description = normalizeDescription(input.description);
   }
-  if (input.content !== undefined) {
-    data.content = input.content as Prisma.InputJsonValue;
-  }
-  if (input.html !== undefined) {
-    data.html = typeof input.html === "string" ? input.html : null;
-  }
-  if (input.react !== undefined) {
-    data.react = typeof input.react === "string" ? input.react : null;
-  }
-  if (input.angular !== undefined) {
-    data.angular = typeof input.angular === "string" ? input.angular : null;
+  if (input.isPrivate !== undefined) {
+    if (typeof input.isPrivate !== "boolean") {
+      throw new TemplateError("isPrivate must be a boolean");
+    }
+    data.isPrivate = input.isPrivate;
   }
   if (input.isCode !== undefined) {
     if (typeof input.isCode !== "boolean") {
