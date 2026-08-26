@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { DraftNumberInput } from "./draft-inputs";
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -92,18 +93,26 @@ export function ColorInput({
 export function NumberInput({
   value,
   min = 0,
+  max,
+  integer = false,
+  "aria-label": ariaLabel,
   onChange,
 }: {
   value: number;
   min?: number;
+  max?: number;
+  integer?: boolean;
+  "aria-label"?: string;
   onChange: (value: number) => void;
 }) {
   return (
-    <input
-      type="number"
+    <DraftNumberInput
       min={min}
+      max={max}
+      integer={integer}
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onCommit={onChange}
+      aria-label={ariaLabel}
       className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
     />
   );
@@ -143,8 +152,10 @@ export function SizeSelect({
       </select>
       {isCustom && (
         <NumberInput
-          value={parseInt(value, 10) || 0}
-          onChange={(n) => onChange(`${n}px`)}
+          value={parseInt(value, 10) || 1}
+          min={1}
+          integer
+          onChange={(n) => onChange(`${Math.round(n)}px`)}
         />
       )}
     </div>

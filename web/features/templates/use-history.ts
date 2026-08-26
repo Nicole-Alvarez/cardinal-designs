@@ -7,6 +7,13 @@ export interface TemplateSnapshot {
   blocks: TemplateBlock[];
   canvas: TemplateCanvas;
   title: string;
+  description: string;
+}
+
+export interface CodeSnapshot {
+  codeBuffers: Record<CodeLang, string>;
+  title: string;
+  description: string;
 }
 
 const MAX_HISTORY = 50;
@@ -90,5 +97,5 @@ export function useTemplateHistory() {
 }
 
 export function useCodeHistory() {
-  return useSnapshotHistory<Record<CodeLang, string>>();
+  return useSnapshotHistory<CodeSnapshot>();
 }

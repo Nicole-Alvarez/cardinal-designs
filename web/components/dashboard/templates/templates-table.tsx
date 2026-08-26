@@ -1,3 +1,4 @@
+import type { TemplateSummary } from "@/features/templates/types";
 import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 export default function TemplatesTable({
@@ -5,12 +6,7 @@ export default function TemplatesTable({
   onDelete,
   deletingId,
 }: {
-  templates: {
-    id: string;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-  }[];
+  templates: TemplateSummary[];
   onDelete: (id: string) => void;
   deletingId: string | null;
 }) {
@@ -46,8 +42,11 @@ export default function TemplatesTable({
                   <span className="block truncate text-sm font-semibold text-zinc-950 dark:text-zinc-50">
                     {template.title}
                   </span>
-                  <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">
-                    Open template editor
+                  <span
+                    className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400"
+                    title={template.description || undefined}
+                  >
+                    {template.description || "No description"}
                   </span>
                 </span>
               </a>

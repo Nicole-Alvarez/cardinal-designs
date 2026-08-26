@@ -18,9 +18,9 @@ function handleError(res: Response, err: unknown) {
   res.status(500).json({ error: "Internal server error" });
 }
 
-router.get("/", requireAuth, async (_req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
-    res.json({ templates: await list() });
+    res.json({ templates: await list(req.user!.id) });
   } catch (err) {
     handleError(res, err);
   }
@@ -28,7 +28,7 @@ router.get("/", requireAuth, async (_req: Request, res: Response) => {
 
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
-    res.status(201).json({ template: await create() });
+    res.status(201).json({ template: await create(req.user!.id) });
   } catch (err) {
     handleError(res, err);
   }
@@ -36,7 +36,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    res.json({ template: await getById(req.params.id) });
+    res.json({ template: await getById(req.params.id, req.user!.id) });
   } catch (err) {
     handleError(res, err);
   }
@@ -44,7 +44,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    res.json({ template: await update(req.params.id, req.body ?? {}) });
+    res.json({ template: await update(req.params.id, req.user!.id, req.body ?? {}) });
   } catch (err) {
     handleError(res, err);
   }
@@ -52,7 +52,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    await remove(req.params.id);
+    await remove(req.params.id, req.user!.id);
     res.json({ ok: true });
   } catch (err) {
     handleError(res, err);

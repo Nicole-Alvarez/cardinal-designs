@@ -12,6 +12,7 @@ import {
 } from "@/components/dashboard/templates/editor-controls";
 import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
 import EditorCommands from "@/components/dashboard/templates/editor-commands";
+import { DraftTextInput } from "@/components/dashboard/templates/draft-inputs";
 import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
 import TemplateEditorFooter from "@/components/dashboard/templates/template-editor-footer";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
@@ -23,6 +24,7 @@ import {
 import {
   useCodeHistory,
   useTemplateHistory,
+  type CodeSnapshot,
   type TemplateSnapshot,
 } from "../use-history";
 import { htmlCodeToWysiwyg, reactCodeToWysiwyg } from "../react-to-wysiwyg";
@@ -46,6 +48,7 @@ type EditorMode = "wysiwyg" | "code";
 export default function TemplateEditorPage({ templateId }: { templateId: string }) {
   const [mode, setMode] = useState<EditorMode>("wysiwyg");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [canvas, setCanvas] = useState<TemplateCanvas>(DEFAULT_CANVAS);
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
   const [previewMetadata, setPreviewMetadata] = useState<TemplateMetadata>([]);
@@ -68,35 +71,44 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const codeHistory = useCodeHistory();
 
   useEffect(() => {
-    history.setCurrent({ blocks, canvas, title });
+    history.setCurrent({ blocks, canvas, title, description });
   });
 
   useEffect(() => {
-    codeHistory.setCurrent(codeBuffers);
+    codeHistory.setCurrent(codeSnapshot());
   });
 
   function snapshot(): TemplateSnapshot {
-    return { blocks, canvas, title };
+    return { blocks, canvas, title, description };
   }
 
   function checkpoint(tag: string) {
     history.checkpoint(snapshot(), tag);
   }
 
+  function codeSnapshot(): CodeSnapshot {
+    return { codeBuffers, title, description };
+  }
+
   function applySnapshot(s: TemplateSnapshot) {
     setBlocks(s.blocks);
     setCanvas(s.canvas);
     setTitle(s.title);
+    setDescription(s.description);
+    markDirty();
+  }
+
+  function applyCodeSnapshot(s: CodeSnapshot) {
+    setCodeBuffers(s.codeBuffers);
+    setTitle(s.title);
+    setDescription(s.description);
     markDirty();
   }
 
   function handleUndo() {
     if (mode === "code") {
-      const buffers = codeHistory.undo();
-      if (buffers) {
-        setCodeBuffers(buffers);
-        markDirty();
-      }
+      const previous = codeHistory.undo();
+      if (previous) applyCodeSnapshot(previous);
       return;
     }
     const snapshot = history.undo();
@@ -105,11 +117,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function handleRedo() {
     if (mode === "code") {
-      const buffers = codeHistory.redo();
-      if (buffers) {
-        setCodeBuffers(buffers);
-        markDirty();
-      }
+      const next = codeHistory.redo();
+      if (next) applyCodeSnapshot(next);
       return;
     }
     const snapshot = history.redo();
@@ -122,6 +131,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       .then((template) => {
         if (cancelled) return;
         setTitle(template.title);
+        setDescription(template.description);
         const parsed = parseContent(template.content);
         setCanvas(parsed.canvas);
         setBlocks(parsed.blocks);
@@ -197,7 +207,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function addBlockAt(x: number, y: number) {
     checkpoint("add");
-    const block = createUniversalBlock(x, y, "text", nextZ());
+    const draft = createUniversalBlock(0, 0, "text", nextZ());
+    const block = {
+      ...draft,
+      x: Math.round(x - draft.width / 2),
+      y: Math.round(y - draft.height / 2),
+    };
     setBlocks((prev) => [...prev, block]);
     setSelectedIds([block.id]);
     setPanelTab("block");
@@ -298,6 +313,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     }
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
+
+      if (isTyping(e.target)) return;
+
       if (mode === "code") {
         if (mod && (e.key === "z" || e.key === "Z")) {
           e.preventDefault();
@@ -309,8 +327,6 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         }
         return;
       }
-
-      if (isTyping(e.target)) return;
 
       // undo/redo work regardless of selection
       if (mod && (e.key === "a" || e.key === "A")) {
@@ -373,7 +389,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest state each render
-  }, [mode, selectedId, selectedIds, blocks, canvas, title]);
+  }, [mode, selectedId, selectedIds, blocks, canvas, title, description]);
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
@@ -395,6 +411,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       if (mode === "wysiwyg") {
         updated = await updateTemplate(templateId, {
           title,
+          description,
           isCode: false,
           content: { version: 4, canvas, blocks, metadata: [] },
           html: generated.html,
@@ -404,12 +421,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       } else {
         updated = await updateTemplate(templateId, {
           title,
+          description,
           isCode: true,
           content: { version: 4, canvas, blocks, metadata: [] },
           [lang]: codeBuffers[lang] || null,
         });
       }
       setSavedAt(new Date(updated.updatedAt).toLocaleString());
+      setDescription(updated.description);
       setDirty(false);
     } catch (err) {
       setError((err as Error).message);
@@ -419,13 +438,21 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   function handleRename(value: string) {
-    checkpoint("rename");
+    if (mode === "code") codeHistory.checkpoint(codeSnapshot(), "rename");
+    else checkpoint("rename");
     setTitle(value);
     markDirty();
   }
 
+  function handleDescriptionChange(value: string) {
+    if (mode === "code") codeHistory.checkpoint(codeSnapshot(), "description");
+    else checkpoint("description");
+    setDescription(value);
+    markDirty();
+  }
+
   function handleCodeChange(langKey: CodeLang, value: string) {
-    codeHistory.checkpoint(codeBuffers, `code:${langKey}`);
+    codeHistory.checkpoint(codeSnapshot(), `code:${langKey}`);
     setCodeBuffers((prev) => ({ ...prev, [langKey]: value }));
     markDirty();
   }
@@ -464,32 +491,43 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   return (
     <>
-      <div className="mx-auto flex h-[calc(100dvh-6.75rem)] w-full max-w-7xl flex-col gap-4 overflow-hidden md:h-[calc(100dvh-3rem)]">
+      <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-4 lg:h-dvh lg:min-h-0 lg:overflow-hidden">
         {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
         <header className="sticky top-0 z-40 shrink-0 overflow-visible rounded-2xl border border-zinc-200 bg-white/95 shadow-md backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div
-          role="toolbar"
-          aria-label="Template editor toolbar"
-          className="flex flex-wrap items-center gap-2 p-2.5"
-        >
-          <EditorTooltip label="Back to templates" align="left">
-            <Link
-              href="/dashboard/templates"
-              aria-label="Back to templates"
-              className="grid size-9 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
-            >
-              <EditorIcon name="arrow-left" />
-            </Link>
-          </EditorTooltip>
+          <div
+            role="toolbar"
+            aria-label="Template editor toolbar"
+            className="flex flex-wrap items-center gap-2 p-2.5"
+          >
+            <EditorTooltip label="Back to templates" align="left">
+              <Link
+                href="/dashboard/templates"
+                aria-label="Back to templates"
+                className="grid size-9 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              >
+                <EditorIcon name="arrow-left" />
+              </Link>
+            </EditorTooltip>
 
-          <span className="hidden h-6 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
+            <span className="hidden h-10 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
 
-          <input
-            value={title}
-            onChange={(e) => handleRename(e.target.value)}
-            aria-label="Template title"
-            className="min-w-48 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-lg font-semibold tracking-tight transition-colors hover:border-zinc-200 focus:border-zinc-300 focus:bg-white focus:outline-none dark:hover:border-zinc-700 dark:focus:border-zinc-600 dark:focus:bg-zinc-950"
-          />
+            <div className="min-w-0 basis-52 flex-1">
+              <DraftTextInput
+                value={title}
+                required
+                onCommit={handleRename}
+                aria-label="Template title"
+                className="block w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-lg font-semibold tracking-tight text-zinc-950 transition-colors hover:border-zinc-200 focus-visible:border-zinc-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-zinc-50 dark:hover:border-zinc-700 dark:focus-visible:border-zinc-600 dark:focus-visible:bg-zinc-950"
+              />
+              <input
+                value={description}
+                onChange={(event) => handleDescriptionChange(event.target.value)}
+                maxLength={500}
+                aria-label="Template description"
+                placeholder="Add a short description"
+                className="block w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-zinc-500 transition-colors placeholder:text-zinc-400 hover:border-zinc-200 focus-visible:border-zinc-300 focus-visible:bg-white focus-visible:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-zinc-400 dark:placeholder:text-zinc-500 dark:hover:border-zinc-700 dark:focus-visible:border-zinc-600 dark:focus-visible:bg-zinc-950 dark:focus-visible:text-zinc-200"
+              />
+            </div>
 
           <div className="flex items-center rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
             {(["wysiwyg", "code"] as const).map((m) => {
@@ -595,7 +633,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         </div>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-0.5 py-0.5 scroll-smooth">
+        <main className="space-y-6 px-0.5 py-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:scroll-smooth">
           {error && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
               {error}
@@ -604,7 +642,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
           {mode === "wysiwyg" ? (
             <>
-              <div className="grid gap-4 lg:h-[70vh] lg:grid-cols-4">
+              <div className="grid gap-4 lg:h-full lg:min-h-0 lg:grid-cols-4">
             <section className="min-h-96 lg:col-span-3 lg:h-full lg:min-h-0">
               <EditorCanvas
                 canvas={canvas}
@@ -626,7 +664,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
             <aside
               data-template-selection-preserving
-              className="h-fit overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
+              className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
             >
               <div
                 role="tablist"
@@ -635,9 +673,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               >
                 {(
                   [
-                    { id: "commands", label: "Commands", icon: "command" },
-                    { id: "canvas", label: "Canvas", icon: "panels-top-left" },
-                    { id: "block", label: "Block", icon: "box" },
+                    { id: "commands", label: "Commands" },
+                    { id: "canvas", label: "Canvas" },
+                    { id: "block", label: "Block" },
                   ] as const
                 ).map((tab) => (
                   <button
@@ -649,13 +687,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                     aria-selected={panelTab === tab.id}
                     onClick={() => setPanelTab(tab.id)}
                     className={
-                      "flex min-w-0 flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                      "flex h-9 min-w-0 items-center justify-center rounded-xl px-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
                       (panelTab === tab.id
                         ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
                         : "text-zinc-400 hover:bg-white/70 hover:text-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200")
                     }
                   >
-                    <EditorIcon name={tab.icon} className="size-4" />
                     <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
@@ -710,7 +747,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               onConvertToWysiwyg={handleConvertToWysiwyg}
             />
           )}
-        </div>
+        </main>
 
         <TemplateEditorFooter
           mode={mode}

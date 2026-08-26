@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   canvasGuidePalette,
   type CanvasGuidePalette,
 } from "@/features/templates/canvas-guides";
+import {
+  CARDINAL_BLOCK_MIME,
+  CARDINAL_NEW_BLOCK_PAYLOAD,
+} from "@/features/templates/drag-types";
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  clampCanvasPan,
+  clampZoom,
+  fitCanvasZoom,
+  stepZoom,
+  zoomPanOffset,
+} from "@/features/templates/canvas-viewport";
 import {
   isSquareBlock,
   workingCanvasSize,
@@ -13,11 +26,13 @@ import {
 } from "@/features/templates/types";
 import BlockPreview from "./block-preview";
 import CanvasStage from "./canvas-stage";
+import { DraftNumberInput } from "./draft-inputs";
 import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 const MIN_SIZE = 16;
 const PANE_PADDING = 32;
 const SNAP_THRESHOLD = 6;
+const MIN_VISIBLE_CANVAS = 64;
 
 type ResizeDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -83,9 +98,21 @@ export default function EditorCanvas({
   gridSize = 8,
   onGridSizeChange,
 }: EditorCanvasProps) {
-  const paneRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startPanX: number;
+    startPanY: number;
+  } | null>(null);
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  const scaleRef = useRef(1);
+  const [viewMode, setViewMode] = useState<"fit" | "manual">("fit");
   const [scale, setScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
   const [interacting, setInteracting] = useState<string | null>(null);
   const [guides, setGuides] = useState<{ xs: number[]; ys: number[] }>({
     xs: [],
@@ -107,18 +134,81 @@ export default function EditorCanvas({
     height: `${size.height}px`,
   };
 
+  const canvasViewportOrigin = useCallback(
+    (
+      viewport: HTMLDivElement,
+      scaleValue = scaleRef.current,
+      scroll = { left: viewport.scrollLeft, top: viewport.scrollTop }
+    ) => {
+      const scaledCanvas = {
+        width: size.width * scaleValue,
+        height: size.height * scaleValue,
+      };
+      const viewportContentWidth = Math.max(
+        0,
+        viewport.clientWidth - PANE_PADDING * 2
+      );
+      return {
+        x:
+          PANE_PADDING +
+          Math.max(0, (viewportContentWidth - scaledCanvas.width) / 2) -
+          scroll.left,
+        y: PANE_PADDING - scroll.top,
+      };
+    },
+    [size.width, size.height]
+  );
+
+  const constrainPanOffset = useCallback(
+    (
+      offset: { x: number; y: number },
+      viewport: HTMLDivElement,
+      scaleValue = scaleRef.current,
+      scroll = { left: viewport.scrollLeft, top: viewport.scrollTop }
+    ) => {
+      const scaledCanvas = {
+        width: size.width * scaleValue,
+        height: size.height * scaleValue,
+      };
+      return clampCanvasPan({
+        offset,
+        viewport: { width: viewport.clientWidth, height: viewport.clientHeight },
+        canvas: scaledCanvas,
+        origin: canvasViewportOrigin(viewport, scaleValue, scroll),
+        minimumVisible: MIN_VISIBLE_CANVAS,
+      });
+    },
+    [canvasViewportOrigin, size.width, size.height]
+  );
+
   useEffect(() => {
-    const el = paneRef.current;
+    const el = viewportRef.current;
     if (!el) return;
     const update = () => {
-      const avail = el.clientWidth - PANE_PADDING * 2;
-      setScale(Math.min(1, Math.max(0.1, avail / size.width)));
+      if (viewMode === "fit") {
+        const nextScale = fitCanvasZoom(
+          { width: el.clientWidth, height: el.clientHeight },
+          { width: size.width, height: size.height },
+          PANE_PADDING
+        );
+        scaleRef.current = nextScale;
+        setScale(nextScale);
+        return;
+      }
+      const nextPan = constrainPanOffset(panOffsetRef.current, el);
+      if (
+        nextPan.x !== panOffsetRef.current.x ||
+        nextPan.y !== panOffsetRef.current.y
+      ) {
+        panOffsetRef.current = nextPan;
+        setPanOffset(nextPan);
+      }
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [size.width]);
+  }, [constrainPanOffset, size.width, size.height, viewMode]);
 
   const dragGuides = useMemo<DistanceMeasurement[]>(() => {
     if (!dragBlock) return [];
@@ -185,8 +275,116 @@ export default function EditorCanvas({
     };
   }
 
+  function applyManualZoom(nextValue: number, anchor?: { x: number; y: number }) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const previousScale = scaleRef.current;
+    const nextScale = clampZoom(nextValue);
+    const zoomAnchor = anchor ?? {
+      x: viewport.clientWidth / 2,
+      y: viewport.clientHeight / 2,
+    };
+    const desiredPan = zoomPanOffset({
+      previousScale,
+      nextScale,
+      pan: panOffsetRef.current,
+      anchor: zoomAnchor,
+      previousOrigin: canvasViewportOrigin(viewport, previousScale),
+      nextOrigin: canvasViewportOrigin(viewport, nextScale),
+    });
+    const nextPan = constrainPanOffset(desiredPan, viewport, nextScale);
+
+    setViewMode("manual");
+    scaleRef.current = nextScale;
+    setScale(nextScale);
+    panOffsetRef.current = nextPan;
+    setPanOffset(nextPan);
+  }
+
+  function handleFitCanvas() {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const nextScale = fitCanvasZoom(
+      { width: viewport.clientWidth, height: viewport.clientHeight },
+      { width: size.width, height: size.height },
+      PANE_PADDING
+    );
+    setViewMode("fit");
+    scaleRef.current = nextScale;
+    setScale(nextScale);
+    const centeredPan = { x: 0, y: 0 };
+    panOffsetRef.current = centeredPan;
+    setPanOffset(centeredPan);
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+  }
+
+  function handleWheel(event: WheelEvent) {
+    if (!event.metaKey && !event.ctrlKey) return;
+    event.preventDefault();
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const factor = Math.exp(-event.deltaY * 0.002);
+    applyManualZoom(scaleRef.current * factor, {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
+  }
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onWheel = (event: WheelEvent) => handleWheel(event);
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onWheel);
+    // Canvas dimensions are the only render values captured by applyManualZoom;
+    // the current scale is read from scaleRef so rapid wheel events accumulate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height]);
+
+  function handlePanStart(event: React.PointerEvent<HTMLDivElement>) {
+    const shouldPan = event.button === 1 || event.button === 2;
+    if (!shouldPan) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPanX: panOffsetRef.current.x,
+      startPanY: panOffsetRef.current.y,
+    };
+    setViewMode("manual");
+    setPanning(true);
+  }
+
+  function handlePanMove(event: React.PointerEvent<HTMLDivElement>) {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const nextOffset = constrainPanOffset(
+      {
+        x: pan.startPanX + event.clientX - pan.startX,
+        y: pan.startPanY + event.clientY - pan.startY,
+      },
+      event.currentTarget
+    );
+    panOffsetRef.current = nextOffset;
+    setPanOffset(nextOffset);
+  }
+
+  function endPan(event: React.PointerEvent<HTMLDivElement>) {
+    if (panRef.current?.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    setPanning(false);
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
+    if (!Array.from(e.dataTransfer.types).includes(CARDINAL_BLOCK_MIME)) return;
+    if (e.dataTransfer.getData(CARDINAL_BLOCK_MIME) !== CARDINAL_NEW_BLOCK_PAYLOAD) return;
     const point = stagePoint(e);
     onAddAt(point.x, point.y);
   }
@@ -443,12 +641,12 @@ export default function EditorCanvas({
   const spacingOverlays = showSpacing ? computeSpacingOverlays() : null;
 
   return (
-    <div className="relative lg:h-full">
+    <div className="relative min-h-96 lg:h-full lg:min-h-0">
       <div
         data-template-selection-preserving
         role="toolbar"
         aria-label="Canvas view controls"
-        className="absolute left-3 top-3 z-30 flex items-center gap-1 rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-md backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95"
+        className="absolute left-3 top-3 z-30 flex max-w-[calc(100%_-_1.5rem)] flex-wrap items-center gap-1 rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-md backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95"
       >
         <EditorTooltip label="Spacing overlay (S)" align="left">
           <button
@@ -487,45 +685,124 @@ export default function EditorCanvas({
         {showGrid && (
           <EditorTooltip label="Grid size in pixels" align="left">
             <label className="flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-              <input
-                type="number"
+              <DraftNumberInput
                 value={gridSize}
-                onChange={(e) =>
-                  onGridSizeChange?.(
-                    Math.max(4, Math.min(64, Number(e.target.value) || 8))
-                  )
-                }
+                onCommit={(size) => onGridSizeChange?.(size)}
                 aria-label="Grid size in pixels"
                 className="w-7 bg-transparent text-right text-xs font-semibold text-zinc-800 outline-none dark:text-zinc-100"
                 min={4}
                 max={64}
+                integer
               />
               px
             </label>
           </EditorTooltip>
         )}
+
+        <span className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+        <button
+          type="button"
+          aria-label="Zoom out"
+          disabled={scale <= MIN_ZOOM + 0.001}
+          onClick={() => applyManualZoom(stepZoom(scale, -1))}
+          className="grid size-8 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          −
+        </button>
+        <output
+          aria-label="Current zoom"
+          className="min-w-12 text-center text-xs font-semibold tabular-nums text-zinc-700 dark:text-zinc-200"
+        >
+          {Math.round(scale * 100)}%
+        </output>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          disabled={scale >= MAX_ZOOM - 0.001}
+          onClick={() => applyManualZoom(stepZoom(scale, 1))}
+          className="grid size-8 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Fit canvas"
+          aria-pressed={viewMode === "fit"}
+          onClick={handleFitCanvas}
+          className="h-8 rounded-lg px-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          Fit
+        </button>
       </div>
 
       <div
-        ref={paneRef}
-        className="max-h-[70vh] overflow-auto rounded-2xl border bg-zinc-50 p-8 shadow-sm dark:bg-zinc-950/40 lg:h-full lg:max-h-none"
+        ref={viewportRef}
+        data-testid="canvas-viewport"
+        onPointerDownCapture={handlePanStart}
+        onPointerMove={handlePanMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onLostPointerCapture={endPan}
+        onContextMenu={(event) => event.preventDefault()}
+        className="min-h-96 overflow-auto rounded-2xl border bg-zinc-50 p-8 shadow-sm dark:bg-zinc-950/40 lg:h-full lg:min-h-0"
+        style={{ cursor: panning ? "grabbing" : undefined }}
       >
-        <div className="mx-auto" style={{ width: size.width * scale }}>
+        <div
+          data-testid="canvas-pan-layer"
+          className="relative mx-auto"
+          style={{
+            width: size.width * scale,
+            height: size.height * scale,
+            transform: `translate3d(${panOffset.x}px, ${panOffset.y}px, 0)`,
+          }}
+        >
           <div
             style={{
+              position: "absolute",
+              inset: 0,
               width: size.width,
               height: size.height,
               transform: `scale(${scale})`,
               transformOrigin: "top left",
             }}
           >
-            <CanvasStage canvas={editorCanvas} showGrid={showGrid} gridSize={gridSize}>
-              <div
+            <CanvasStage
+              canvas={editorCanvas}
+              showGrid={showGrid}
+              gridSize={gridSize}
+              content={
+                <>
+                  {[...blocks]
+                    .sort((a, b) => a.z - b.z)
+                    .map((block) => (
+                      <div
+                        key={block.id}
+                        className="pointer-events-none absolute"
+                        style={{
+                          left: block.x,
+                          top: block.y,
+                          width: block.width,
+                          height: block.height,
+                          zIndex: block.z,
+                        }}
+                      >
+                        <BlockPreview block={block} />
+                      </div>
+                    ))}
+                </>
+              }
+              interaction={
+                <div
                 ref={stageRef}
+                data-testid="canvas-drop-layer"
                 data-template-selection-preserving
                 className="absolute inset-0"
                 onPointerDown={() => onSelect(null)}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={(e) => {
+                  if (Array.from(e.dataTransfer.types).includes(CARDINAL_BLOCK_MIME)) {
+                    e.preventDefault();
+                  }
+                }}
                 onDrop={handleDrop}
               >
               {spacingOverlays?.padding.map((p, i) => (
@@ -568,7 +845,6 @@ export default function EditorCanvas({
                   <BlockFrame
                     key={block.id}
                     block={block}
-                    previewBlock={block}
                     selected={selectedIds.includes(block.id)}
                     scale={scale}
                     interacting={interacting === block.id}
@@ -632,8 +908,9 @@ export default function EditorCanvas({
                   palette={guidePalette}
                 />
               ))}
-              </div>
-            </CanvasStage>
+                </div>
+              }
+            />
           </div>
         </div>
       </div>
@@ -751,7 +1028,6 @@ function DistanceMeasurementGuide({
 
 function BlockFrame({
   block,
-  previewBlock,
   selected,
   scale,
   interacting,
@@ -765,7 +1041,6 @@ function BlockFrame({
   onDragPosition,
 }: {
   block: TemplateBlock;
-  previewBlock: TemplateBlock;
   selected: boolean;
   scale: number;
   interacting: boolean;
@@ -888,8 +1163,6 @@ function BlockFrame({
       onPointerCancel={endGesture}
       onDragStart={(e) => e.preventDefault()}
     >
-      <BlockPreview block={previewBlock} />
-
       {selected && (
         <>
           {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as ResizeDir[]).map((dir) => (

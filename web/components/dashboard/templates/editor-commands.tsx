@@ -1,8 +1,10 @@
 "use client";
 
+import {
+  CARDINAL_BLOCK_MIME,
+  CARDINAL_NEW_BLOCK_PAYLOAD,
+} from "@/features/templates/drag-types";
 import { EditorIcon } from "./editor-controls";
-
-const DRAG_MIME = "application/x-cardinal-block";
 
 export default function EditorCommands({
   onAdd,
@@ -18,7 +20,9 @@ export default function EditorCommands({
       <button
         type="button"
         draggable
-        onDragStart={(e) => e.dataTransfer.setData(DRAG_MIME, "new")}
+        onDragStart={(e) =>
+          e.dataTransfer.setData(CARDINAL_BLOCK_MIME, CARDINAL_NEW_BLOCK_PAYLOAD)
+        }
         onClick={onAdd}
         className="group flex w-full cursor-grab items-center gap-3 rounded-xl border border-transparent p-2.5 text-left transition-colors hover:border-zinc-200 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 active:cursor-grabbing dark:hover:border-zinc-700 dark:hover:bg-zinc-800/70"
       >

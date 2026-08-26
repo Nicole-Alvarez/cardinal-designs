@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { isSquareBlock, type BlockStyle, type BlockType, type TemplateBlock } from "@/features/templates/types";
 import { uploadBlockImage } from "@/features/templates/queries";
 import { FONT_OPTIONS } from "@/features/templates/fonts";
+import { DraftNumberInput } from "./draft-inputs";
 import { ColorInput, Field } from "./inspector-controls";
 import IconPicker from "./icon-picker";
 
@@ -130,6 +131,7 @@ export default function BlockInspector({
             <GeometryInput
               label="Z-index"
               value={block.z}
+              min={0}
               onChange={(z) => onChange({ z: Math.max(0, Math.round(z)) })}
             />
           </div>
@@ -268,17 +270,12 @@ export default function BlockInspector({
                     className="flex-1 accent-zinc-900 dark:accent-zinc-100"
                   />
                   {block.type === "text" ? (
-                    <input
-                      type="number"
+                    <DraftNumberInput
                       min={10}
                       max={64}
-                      step={1}
+                      integer
                       value={block.style.fontSize}
-                      onChange={(e) =>
-                        onStyleChange({
-                          fontSize: Math.max(10, Math.min(64, Number(e.target.value) || 10)),
-                        })
-                      }
+                      onCommit={(fontSize) => onStyleChange({ fontSize })}
                       aria-label="Font size in pixels"
                       className="w-16 rounded-lg border border-zinc-300 bg-transparent px-2 py-1 text-right text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-300"
                     />
@@ -359,23 +356,13 @@ export default function BlockInspector({
                       </option>
                     ))}
                   </select>
-                  <input
-                    type="number"
+                  <DraftNumberInput
                     min={100}
                     max={900}
+                    integer
                     value={block.style.fontWeight}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (Number.isFinite(n)) onStyleChange({ fontWeight: n });
-                    }}
-                    onBlur={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
-                      const clamped = Math.min(900, Math.max(100, Math.round(n)));
-                      if (clamped !== block.style.fontWeight) {
-                        onStyleChange({ fontWeight: clamped });
-                      }
-                    }}
+                    onCommit={(fontWeight) => onStyleChange({ fontWeight })}
+                    aria-label="Font weight"
                     className="w-16 rounded-lg border border-zinc-300 bg-transparent px-1 py-1.5 text-center text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
                   />
                 </div>
@@ -431,12 +418,13 @@ export default function BlockInspector({
           )}
           <Field label="Corner radius">
             <div className="flex items-center gap-2">
-              <input
-                type="number"
+              <DraftNumberInput
                 min={0}
                 max={48}
+                integer
                 value={block.style.borderRadius}
-                onChange={(e) => onStyleChange({ borderRadius: Number(e.target.value) })}
+                onCommit={(borderRadius) => onStyleChange({ borderRadius })}
+                aria-label="Corner radius in pixels"
                 className="w-full rounded-md border border-zinc-300 bg-transparent px-1 py-1 text-center text-xs focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
               />
               <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
@@ -472,7 +460,7 @@ export default function BlockInspector({
 function GeometryInput({
   label,
   value,
-  min = 0,
+  min,
   onChange,
 }: {
   label: string;
@@ -485,11 +473,12 @@ function GeometryInput({
       <span className="block text-center text-[10px] uppercase text-zinc-400 dark:text-zinc-500">
         {label}
       </span>
-      <input
-        type="number"
+      <DraftNumberInput
+        aria-label={label}
         min={min}
+        integer
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onCommit={onChange}
         className="w-full rounded-md border border-zinc-300 bg-transparent px-1 py-1 text-center text-xs focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
       />
     </label>

@@ -1,4 +1,4 @@
-import { Prisma, Template } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma";export class TemplateError extends Error {
   constructor(message: string, public statusCode = 400) {
     super(message);
@@ -8,6 +8,7 @@ import prisma from "../prisma";export class TemplateError extends Error {
 const publicColumns = {
   id: true,
   title: true,
+  description: true,
   content: true,
   html: true,
   react: true,
@@ -17,6 +18,8 @@ const publicColumns = {
   updatedAt: true,
 };
 
+type Template = Prisma.TemplateGetPayload<{ select: typeof publicColumns }>;
+
 function randomSuffix() {
   return Math.random().toString(36).slice(2, 8);
 }
@@ -24,20 +27,28 @@ function randomSuffix() {
 export interface TemplateSummary {
   id: string;
   title: string;
+  description: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export async function list(): Promise<TemplateSummary[]> {
+export async function list(userId: string): Promise<TemplateSummary[]> {
   return prisma.template.findMany({
-    select: { id: true, title: true, createdAt: true, updatedAt: true },
+    where: { userId },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     orderBy: { updatedAt: "desc" },
   });
 }
 
-export async function getById(id: string): Promise<Template> {
-  const template = await prisma.template.findUnique({
-    where: { id },
+export async function getById(id: string, userId: string): Promise<Template> {
+  const template = await prisma.template.findFirst({
+    where: { id, userId },
     select: publicColumns,
   });
   if (!template) {
@@ -46,11 +57,15 @@ export async function getById(id: string): Promise<Template> {
   return template;
 }
 
-export async function create(): Promise<Template> {
+export async function create(userId: string): Promise<Template> {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return await prisma.template.create({
-        data: { title: `Untitled-${randomSuffix()}` },
+        data: {
+          userId,
+          title: `Untitled-${randomSuffix()}`,
+          description: "",
+        },
         select: publicColumns,
       });
     } catch (err) {
@@ -67,6 +82,7 @@ export async function create(): Promise<Template> {
 
 export interface UpdateTemplateInput {
   title?: unknown;
+  description?: unknown;
   content?: unknown;
   html?: unknown;
   react?: unknown;
@@ -74,8 +90,20 @@ export interface UpdateTemplateInput {
   isCode?: unknown;
 }
 
+function normalizeDescription(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new TemplateError("Description must be a string");
+  }
+  const description = value.trim();
+  if (description.length > 500) {
+    throw new TemplateError("Description must be 500 characters or fewer");
+  }
+  return description;
+}
+
 export async function update(
   id: string,
+  userId: string,
   input: UpdateTemplateInput
 ): Promise<Template> {
   const data: Prisma.TemplateUpdateInput = {};
@@ -85,6 +113,9 @@ export async function update(
       throw new TemplateError("Title must be a non-empty string");
     }
     data.title = input.title.trim();
+  }
+  if (input.description !== undefined) {
+    data.description = normalizeDescription(input.description);
   }
   if (input.content !== undefined) {
     data.content = input.content as Prisma.InputJsonValue;
@@ -107,7 +138,7 @@ export async function update(
 
   try {
     return await prisma.template.update({
-      where: { id },
+      where: { id, userId },
       data,
       select: publicColumns,
     });
@@ -124,9 +155,9 @@ export async function update(
   }
 }
 
-export async function remove(id: string): Promise<void> {
+export async function remove(id: string, userId: string): Promise<void> {
   try {
-    await prisma.template.delete({ where: { id } });
+    await prisma.template.delete({ where: { id, userId } });
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&

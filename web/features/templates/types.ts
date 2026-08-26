@@ -3,6 +3,7 @@ import { DEFAULT_ICON_NAME } from "./icons";
 export interface TemplateSummary {
   id: string;
   title: string;
+  description: string;
   createdAt: string;
   updatedAt: string;
 }
