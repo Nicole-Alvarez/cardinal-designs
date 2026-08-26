@@ -100,8 +100,8 @@ export interface TemplateCanvas {
 }
 
 export const DEFAULT_CANVAS: TemplateCanvas = {
-  width: "auto",
-  height: "auto",
+  width: "505px",
+  height: "319px",
   backgroundColor: "#ffffff",
   textColor: "#000000",
   overlayImage: "",
