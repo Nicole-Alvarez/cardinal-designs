@@ -7,6 +7,7 @@ import { FONT_OPTIONS } from "@/features/templates/fonts";
 import { DraftNumberInput } from "./draft-inputs";
 import { ColorInput, Field } from "./inspector-controls";
 import IconPicker from "./icon-picker";
+import ImageSourceNotice from "./image-source-notice";
 
 const VARIANTS: { type: BlockType; label: string }[] = [
   { type: "text", label: "Text" },
@@ -218,6 +219,7 @@ export default function BlockInspector({
               {uploadError && (
                 <p className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
               )}
+              <ImageSourceNotice source={block.src ?? ""} />
               <input
                 ref={fileInputRef}
                 type="file"

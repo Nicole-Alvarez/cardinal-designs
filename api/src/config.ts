@@ -13,4 +13,5 @@ export const config = {
   sessionTtlMs: SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
   cookieName: "cardinal_session",
   blobToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
+  publicBlobToken: process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ?? "",
 };

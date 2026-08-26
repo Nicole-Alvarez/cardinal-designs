@@ -33,7 +33,7 @@ router.post("/", requireAuth, uploadSingle, handleUploadMiddleware, async (req: 
       return res.status(400).json({ error: "No file provided" });
     }
     const uploaded = await putImage(req.file.buffer, req.file.mimetype);
-    res.json({ pathname: uploaded.pathname });
+    res.json({ pathname: uploaded.pathname, url: uploaded.url });
   } catch (err) {
     if (err instanceof UploadsError) {
       return res.status(err.statusCode).json({ error: err.message });

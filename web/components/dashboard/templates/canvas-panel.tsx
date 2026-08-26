@@ -1,6 +1,7 @@
 "use client";
 
 import type { TemplateCanvas } from "@/features/templates/types";
+import ImageSourceNotice from "./image-source-notice";
 import { ColorInput, Field, NumberInput, SizeSelect } from "./inspector-controls";
 
 const WIDTH_PRESETS = ["1280px", "1024px", "800px", "400px"];
@@ -95,12 +96,15 @@ export default function CanvasPanel({
       </Field>
 
       <Field label="Overlay image URL">
-        <input
-          value={canvas.overlayImage}
-          onChange={(e) => onChange({ overlayImage: e.target.value })}
-          placeholder="https://... (transparent PNG works best)"
-          className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
-        />
+        <div className="space-y-1">
+          <input
+            value={canvas.overlayImage}
+            onChange={(e) => onChange({ overlayImage: e.target.value })}
+            placeholder="https://... (transparent PNG works best)"
+            className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+          />
+          <ImageSourceNotice source={canvas.overlayImage} />
+        </div>
       </Field>
 
       {canvas.overlayImage && (

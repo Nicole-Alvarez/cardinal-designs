@@ -49,7 +49,7 @@ cd api && yarn db:seed
 
 ## Env files
 
-- `api/.env` — `DATABASE_URL`, `AUTH_SECRET_KEY`, `PORT`, `FRONTEND_URL`, `BLOB_READ_WRITE_TOKEN` (Vercel Blob private uploads; create a store at vercel.com to get a token)
+- `api/.env` — `DATABASE_URL`, `AUTH_SECRET_KEY`, `PORT`, `FRONTEND_URL`, `BLOB_READ_WRITE_TOKEN` (legacy private image reads), and `PUBLIC_BLOB_READ_WRITE_TOKEN` (new public-by-link template uploads). The public token must belong to a separate Vercel Blob store created with Public access; Vercel cannot change an existing Private store to Public.
 - `web/.env.local` — `NEXT_PUBLIC_API_URL`
 
 ## Scripts

@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload, apiUrl } from "@/lib/api";
+import { apiFetch, apiUpload } from "@/lib/api";
 import type { Template, TemplateSummary } from "./types";
 
 export async function listTemplates(): Promise<TemplateSummary[]> {
@@ -47,9 +47,13 @@ export async function deleteTemplate(id: string): Promise<void> {
   });
 }
 
-/** Uploads an image and returns its authenticated serving URL. */
+/** Uploads an image and returns its permanent public serving URL. */
 export async function uploadBlockImage(file: File): Promise<string> {
-  const data = await apiUpload<{ pathname: string }>("/api/uploads", file);
-  // raw slashes are valid in a query string; keeps the URL readable
-  return `${apiUrl("/api/uploads/blob")}?pathname=${data.pathname}`;
+  const data = await apiUpload<{ pathname: string; url: string }>("/api/uploads", file);
+  try {
+    if (new URL(data.url).protocol !== "https:") throw new Error();
+  } catch {
+    throw new Error("Upload did not return a portable image URL");
+  }
+  return data.url;
 }
