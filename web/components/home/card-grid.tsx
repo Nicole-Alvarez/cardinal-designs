@@ -4,7 +4,7 @@ import CardItem from "./card-item";
 export default function CardGrid({ cards }: { cards: Card[] }) {
   if (cards.length === 0) {
     return (
-      <p className="mt-10 rounded-2xl border border-dashed border-zinc-300 p-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+      <p className="mt-10 rounded-2xl border border-dashed border-border-strong bg-surface-1 p-10 text-center text-sm text-text-secondary">
         No designs match your search.
       </p>
     );

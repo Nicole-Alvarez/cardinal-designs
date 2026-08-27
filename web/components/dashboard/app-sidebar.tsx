@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/logout-button";
+import { buttonClassName } from "@/components/ui/button";
+import { EditorIcon } from "@/components/dashboard/templates/editor-controls";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { activeMenuItem, visibleMenuItems } from "@/lib/sidebar-menu";
 
@@ -19,9 +21,10 @@ export default function AppSidebar({ user, onNavigate, onClose, titleId }: AppSi
   const active = activeMenuItem(items, pathname);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-surface-1">
       <div className="flex min-h-16 items-center justify-between gap-3 px-5 py-3">
-        <p id={titleId} className="text-sm font-semibold tracking-tight">
+        <p id={titleId} className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
           {onClose ? "Main navigation" : "cardinal-designs"}
         </p>
         {onClose && (
@@ -29,7 +32,7 @@ export default function AppSidebar({ user, onNavigate, onClose, titleId }: AppSi
             type="button"
             aria-label="Close menu"
             onClick={onClose}
-            className="grid size-11 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className={buttonClassName("ghost", "icon")}
           >
             <svg
               aria-hidden="true"
@@ -47,7 +50,7 @@ export default function AppSidebar({ user, onNavigate, onClose, titleId }: AppSi
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+      <nav aria-label="Primary" className="flex-1 space-y-1 overflow-y-auto px-3">
         {items.map((item) => (
           <Link
             key={item.href}
@@ -56,21 +59,25 @@ export default function AppSidebar({ user, onNavigate, onClose, titleId }: AppSi
             aria-current={active?.href === item.href ? "page" : undefined}
             className={
               active?.href === item.href
-                ? "flex min-h-11 items-center rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:bg-zinc-800 dark:text-zinc-50"
-                : "flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                ? "flex min-h-11 items-center gap-3 rounded-lg bg-accent-soft px-3 py-2 text-sm font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                : "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             }
           >
+            <EditorIcon
+              name={item.icon}
+              className={`size-4 shrink-0 ${
+                active?.href === item.href ? "text-accent" : "text-text-muted"
+              }`}
+            />
             {item.label}
           </Link>
         ))}
       </nav>
 
-      <div className="space-y-2 border-t border-zinc-200 px-4 py-4 dark:border-zinc-800">
+      <div className="space-y-3 border-t border-border-subtle px-4 py-4">
         <div>
-          <p className="text-sm font-medium">{user.name ?? user.username}</p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            {ROLE_LABELS[user.role]}
-          </p>
+          <p className="text-sm font-medium text-text-primary">{user.name ?? user.username}</p>
+          <p className="text-xs text-text-muted">{ROLE_LABELS[user.role]}</p>
         </div>
         <LogoutButton />
       </div>

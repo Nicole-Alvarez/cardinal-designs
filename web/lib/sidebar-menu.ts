@@ -3,12 +3,23 @@ import { canAccess, type Role } from "./roles";
 export interface MenuItem {
   label: string;
   href: string;
+  icon: string;
   allowedRoles: readonly Role[];
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { label: "Dashboard", href: "/dashboard", allowedRoles: ["admin", "member"] },
-  { label: "Templates", href: "/dashboard/templates", allowedRoles: ["admin", "member"] },
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: "grid-3x3",
+    allowedRoles: ["admin", "member"],
+  },
+  {
+    label: "Templates",
+    href: "/dashboard/templates",
+    icon: "layout-template",
+    allowedRoles: ["admin", "member"],
+  },
 ];
 
 export function visibleMenuItems(role: Role): MenuItem[] {

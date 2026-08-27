@@ -6,6 +6,22 @@ import AppShell from "./app-shell";
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
 
 describe("AppShell mobile navigation", () => {
+  it("identifies the primary navigation, current route, and signed-in user", () => {
+    render(
+      <AppShell user={{ username: "nicole", name: "Nicole", role: "admin" }}>
+        <p>Dashboard content</p>
+      </AppShell>
+    );
+
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveClass("bg-accent-soft");
+    expect(screen.getByText("Nicole")).toBeInTheDocument();
+  });
+
   it("opens as a keyboard-contained dialog and restores focus when closed", async () => {
     const user = userEvent.setup();
     render(
