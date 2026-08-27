@@ -1,6 +1,3 @@
-// Prisma schema for cardinal-designs
-// Docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,35 +12,35 @@ model User {
   username     String     @unique
   passwordHash String
   name         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   role         String     @default("member")
   sessions     Session[]
   templates    Template[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
 }
 
 model Session {
   id        String   @id @default(cuid())
   token     String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Template {
-  id          String    @id @default(cuid())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  id          String   @id @default(cuid())
   title       String
-  description String    @default("")
-  isPrivate   Boolean   @default(true)
-  isCode      Boolean   @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isCode      Boolean  @default(false)
+  description String   @default("")
+  userId      String
+  isPrivate   Boolean  @default(true)
   canvases    Canvas[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, title])
   @@index([userId])
@@ -51,7 +48,6 @@ model Template {
 
 model Canvas {
   id         String   @id @default(cuid())
-  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
   templateId String
   title      String
   position   Int      @default(0)
@@ -61,7 +57,63 @@ model Canvas {
   angular    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, title])
   @@index([templateId])
+}
+
+model activity_events {
+  id         String   @id @db.Uuid
+  file_id    String?  @db.Uuid
+  user_id    String   @db.Uuid
+  action     String
+  permission String
+  metadata   Json?
+  created_at DateTime @default(now())
+  files      files?   @relation(fields: [file_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([file_id])
+  @@index([user_id])
+}
+
+model files {
+  id              String            @id @db.Uuid
+  user_id         String            @db.Uuid
+  name            String
+  mime_type       String
+  size            Int
+  storage_path    String
+  created_at      DateTime          @default(now())
+  updated_at      DateTime
+  content_hash    String?
+  activity_events activity_events[]
+  watermarks      watermarks?
+
+  @@index([content_hash])
+  @@index([user_id])
+}
+
+model watermark_issuances {
+  id           String     @id @db.Uuid
+  watermark_id String     @db.Uuid
+  issuance_id  String
+  download_id  String?
+  created_at   DateTime   @default(now())
+  watermarks   watermarks @relation(fields: [watermark_id], references: [id], onDelete: Cascade)
+
+  @@index([issuance_id])
+  @@index([watermark_id])
+}
+
+model watermarks {
+  id                  String                @id @db.Uuid
+  file_id             String                @unique @db.Uuid
+  version             Int                   @default(1)
+  payload             Json
+  signature           String
+  created_at          DateTime              @default(now())
+  watermark_issuances watermark_issuances[]
+  files               files                 @relation(fields: [file_id], references: [id], onDelete: Cascade)
 }
