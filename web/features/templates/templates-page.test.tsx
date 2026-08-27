@@ -16,6 +16,16 @@ import TemplatesPage from "./templates-page";
 describe("TemplatesPage loading errors", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("uses collection-shaped skeleton rows while templates load", () => {
+    queries.listTemplates.mockReturnValue(new Promise(() => undefined));
+
+    render(<TemplatesPage />);
+
+    const loadingState = screen.getByRole("status", { name: "Loading templates" });
+    expect(loadingState).toBeInTheDocument();
+    expect(loadingState.querySelectorAll("article")).toHaveLength(3);
+  });
+
   it("replaces the loading state with a recoverable error and retries", async () => {
     queries.listTemplates
       .mockRejectedValueOnce(new Error("Templates are unavailable."))

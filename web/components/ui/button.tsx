@@ -1,4 +1,4 @@
-import type React from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
 export type ButtonSize = "default" | "compact" | "icon";
@@ -34,13 +34,23 @@ export function buttonClassName(
     .join(" ");
 }
 
-export function Button(
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
     variant?: ButtonVariant;
     size?: ButtonSize;
   }
-): React.JSX.Element {
+>(function Button(
+  props,
+  ref
+) {
   const { variant = "primary", size = "default", className, ...buttonProps } = props;
 
-  return <button className={buttonClassName(variant, size, className)} {...buttonProps} />;
-}
+  return (
+    <button
+      ref={ref}
+      className={buttonClassName(variant, size, className)}
+      {...buttonProps}
+    />
+  );
+});

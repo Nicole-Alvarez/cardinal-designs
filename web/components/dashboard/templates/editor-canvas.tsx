@@ -6,8 +6,8 @@ import {
   type CanvasGuidePalette,
 } from "@/features/templates/canvas-guides";
 import {
+  blockTypeFromDragPayload,
   CARDINAL_BLOCK_MIME,
-  CARDINAL_NEW_BLOCK_PAYLOAD,
 } from "@/features/templates/drag-types";
 import {
   MAX_ZOOM,
@@ -21,6 +21,7 @@ import {
 import {
   isSquareBlock,
   workingCanvasSize,
+  type BlockType,
   type TemplateBlock,
   type TemplateCanvas,
 } from "@/features/templates/types";
@@ -72,7 +73,7 @@ interface EditorCanvasProps {
     id: string,
     patch: { x?: number; y?: number; width: number; height: number }
   ) => void;
-  onAddAt: (x: number, y: number) => void;
+  onAddAt: (x: number, y: number, type: BlockType) => void;
   onDelete: (id: string) => void;
   showSpacing?: boolean;
   onShowSpacingChange?: (show: boolean) => void;
@@ -384,9 +385,12 @@ export default function EditorCanvas({
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     if (!Array.from(e.dataTransfer.types).includes(CARDINAL_BLOCK_MIME)) return;
-    if (e.dataTransfer.getData(CARDINAL_BLOCK_MIME) !== CARDINAL_NEW_BLOCK_PAYLOAD) return;
+    const type = blockTypeFromDragPayload(
+      e.dataTransfer.getData(CARDINAL_BLOCK_MIME)
+    );
+    if (!type) return;
     const point = stagePoint(e);
-    onAddAt(point.x, point.y);
+    onAddAt(point.x, point.y, type);
   }
 
   function handleInteract(id: string | null) {
@@ -1185,7 +1189,7 @@ function BlockFrame({
               e.stopPropagation();
               onDelete();
             }}
-            className="absolute grid cursor-pointer place-items-center rounded-full bg-zinc-900 font-medium leading-none text-white transition-colors hover:bg-red-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-red-500"
+            className="absolute grid cursor-pointer place-items-center rounded-full bg-zinc-900 font-medium leading-none text-white transition-colors hover:bg-red-600 dark:hover:bg-red-500 dark:hover:text-white"
             style={{
               top: -8 * inv,
               right: -8 * inv,
@@ -1196,7 +1200,7 @@ function BlockFrame({
               zIndex: 11,
             }}
           >
-            ×
+            <EditorIcon name="x" className="size-full p-0.5" />
           </button>
           {interacting && (
             <span

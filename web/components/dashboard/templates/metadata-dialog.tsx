@@ -9,6 +9,7 @@ import {
 } from "@/features/templates/metadata";
 import type { TemplateMetadata } from "@/features/templates/types";
 import AccessibleDialog from "@/components/ui/accessible-dialog";
+import { Button } from "@/components/ui/button";
 import { EditorIcon } from "./editor-controls";
 
 interface MetadataDialogProps {
@@ -118,29 +119,30 @@ function MetadataDialogContent({
       labelledBy="metadata-dialog-title"
       describedBy="metadata-dialog-description"
       initialFocusRef={textareaRef}
-      panelClassName="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
+      panelClassName="w-full max-w-2xl rounded-2xl border border-border-subtle bg-surface-1 p-5 text-text-primary shadow-2xl"
     >
       <div data-template-selection-preserving>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="metadata-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            <h2 id="metadata-dialog-title" className="text-lg font-semibold text-text-primary">
               Preview data
             </h2>
-            <p id="metadata-dialog-description" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p id="metadata-dialog-description" className="mt-1 text-xs text-text-secondary">
               Each JSON object or CSV row renders one preview. Use values in blocks with {"{{field}}"}.
             </p>
             <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
               Preview data is temporary and is never saved with the template.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onClose}
             aria-label="Close preview data dialog"
-            className="grid size-11 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            variant="ghost"
+            size="icon"
           >
             <EditorIcon name="x" />
-          </button>
+          </Button>
         </div>
 
         {detectedPaths.length > 0 && (
@@ -150,7 +152,7 @@ function MetadataDialogContent({
             </p>
             <div className="flex flex-wrap gap-1.5">
               {detectedPaths.map((path) => (
-                <code key={path} className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  <code key={path} className="rounded bg-surface-2 px-2 py-1 text-xs text-text-secondary">
                   {path}
                 </code>
               ))}
@@ -168,13 +170,14 @@ function MetadataDialogContent({
                 {summary.length} {summary.length === 1 ? "record" : "records"} · {metadataFieldCount(summary)} fields
               </span>
             )}
-            <button
+            <Button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="compact"
             >
               Import JSON or CSV
-            </button>
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -195,7 +198,7 @@ function MetadataDialogContent({
           }}
           rows={16}
           spellCheck={false}
-          className="mt-2 w-full rounded-xl border border-zinc-300 bg-white p-3 font-mono text-sm leading-relaxed text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+          className="mt-2 w-full rounded-xl border border-border-subtle bg-surface-2 p-3 font-mono text-sm leading-relaxed text-text-primary outline-none focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
         />
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
           Extra fields are ignored. When a field is missing, its placeholder remains in the preview.
@@ -208,20 +211,19 @@ function MetadataDialogContent({
         )}
 
         <div className="mt-4 flex justify-end gap-2">
-          <button
+          <Button
             type="button"
             onClick={handleCheck}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            variant="secondary"
           >
             Check JSON
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
             Apply to preview
-          </button>
+          </Button>
         </div>
       </div>
     </AccessibleDialog>

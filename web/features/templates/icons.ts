@@ -1,4 +1,5 @@
 import { GENERATED_ICONS } from "./icons-data.generated";
+export { DEFAULT_ICON_NAME } from "./icon-constants";
 
 export interface IconEntry {
   name: string;
@@ -7,9 +8,6 @@ export interface IconEntry {
 
 export const ICONS: IconEntry[] = GENERATED_ICONS;
 const ICON_MAP = new Map(ICONS.map((icon) => [icon.name, icon.svg]));
-
-/** Lucide icon assigned to new icon blocks. */
-export const DEFAULT_ICON_NAME = "star";
 
 const svgAttrsHtml =
   'viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';

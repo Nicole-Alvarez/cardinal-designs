@@ -18,19 +18,25 @@ const canvasQueries = vi.hoisted(() => ({
 vi.mock("../queries", () => queries);
 vi.mock("../canvas-queries", () => canvasQueries);
 vi.mock("@/components/dashboard/templates/editor-canvas", () => ({
-  default: () => <div>Canvas stub</div>,
+  default: ({ blocks }: { blocks: { type: string }[] }) => (
+    <div>Canvas blocks: {blocks.map((block) => block.type).join(", ") || "none"}</div>
+  ),
 }));
 vi.mock("@/components/dashboard/templates/editor-commands", () => ({
-  default: () => <div>Commands panel</div>,
+  default: ({ onAdd }: { onAdd: (type: "image") => void }) => (
+    <button type="button" onClick={() => onAdd("image")}>Add image</button>
+  ),
 }));
 vi.mock("@/components/dashboard/templates/canvas-panel", () => ({
   default: () => <div>Canvas panel</div>,
 }));
 vi.mock("@/components/dashboard/templates/block-inspector", () => ({
-  default: () => <div>Block panel</div>,
+  default: ({ block }: { block: { type: string } | null }) => (
+    <div>{block ? `Selected block: ${block.type}` : "No selected block"}</div>
+  ),
 }));
 vi.mock("@/components/dashboard/templates/code-editor-panel", () => ({
-  default: () => <div>Code editor</div>,
+  default: ({ lang }: { lang: string }) => <div>Code editor language: {lang}</div>,
 }));
 vi.mock("@/components/dashboard/templates/code-output", () => ({
   default: () => <div>Code output</div>,
@@ -107,5 +113,65 @@ describe("TemplateEditorPage panel tabs", () => {
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByDisplayValue("Recovered template")).toBeInTheDocument();
+  });
+
+  it("creates the requested block type, selects it, and records one undo step", async () => {
+    queries.getTemplate.mockResolvedValue({
+      id: "template-a",
+      title: "Member Card",
+      description: "",
+      isPrivate: true,
+      isCode: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const user = userEvent.setup();
+    render(<TemplateEditorPage templateId="template-a" />);
+
+    await user.click(await screen.findByRole("tab", { name: "Add" }));
+    const undo = screen.getByRole("button", { name: "Undo" });
+    expect(undo).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Add image" }));
+
+    expect(screen.getByText("Canvas blocks: image")).toBeInTheDocument();
+    expect(screen.getByText("Selected block: image")).toBeInTheDocument();
+    expect(undo).toBeEnabled();
+  });
+
+  it("falls back to HTML when a saved code canvas only contains Angular", async () => {
+    queries.getTemplate.mockResolvedValue({
+      id: "template-a",
+      title: "Member Card",
+      description: "",
+      isPrivate: true,
+      isCode: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    canvasQueries.listCanvases.mockResolvedValue([
+      {
+        id: "canvas-a",
+        title: "Front",
+        position: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+    canvasQueries.getCanvas.mockResolvedValue({
+      id: "canvas-a",
+      title: "Front",
+      position: 0,
+      content: { version: 4, canvas: DEFAULT_CANVAS, blocks: [], metadata: [] },
+      html: "",
+      react: "",
+      angular: "export class Card {}",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    render(<TemplateEditorPage templateId="template-a" />);
+
+    expect(await screen.findByText("Code editor language: html")).toBeInTheDocument();
   });
 });

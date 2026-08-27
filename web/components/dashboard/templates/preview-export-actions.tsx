@@ -130,7 +130,7 @@ export default function PreviewExportActions({
 
   return (
     <div className="flex min-w-0 flex-col items-end gap-2">
-      <div className="flex items-center gap-1 rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
+      <div className="flex items-center gap-1 rounded-xl border border-border-subtle bg-surface-2 p-1">
         <EditorTooltip
           label={exporting === "print" ? "Preparing print…" : "Print preview"}
           align="right"
@@ -140,7 +140,7 @@ export default function PreviewExportActions({
             onClick={handlePrint}
             disabled={exporting !== null}
             aria-label={exporting === "print" ? "Preparing print" : "Print preview"}
-            className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
+            className="grid size-11 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-40 sm:size-9"
           >
             <EditorIcon
               name={exporting === "print" ? "loader-circle" : "printer"}
@@ -159,7 +159,7 @@ export default function PreviewExportActions({
             aria-label={
               exporting === "png" ? "Exporting preview as PNG" : "Download preview as PNG"
             }
-            className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
+            className="grid size-11 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-40 sm:size-9"
           >
             <EditorIcon
               name={exporting === "png" ? "loader-circle" : "image-down"}

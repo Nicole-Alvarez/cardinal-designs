@@ -259,14 +259,14 @@ function blockFromFrame(frame: AstNode, index: number): TemplateBlock {
   if (children.length > 1) throw new Error(`Block ${index + 1} has an unsupported nested structure.`);
   const inner = children[0] ?? null;
   const tag = inner ? jsxTag(inner) : null;
+  const isLegacyDivider = tag === "hr";
   let type: BlockType;
-  if (!inner) type = "spacer";
+  if (!inner || isLegacyDivider) type = "text";
   else if (tag === "p") type = "text";
   else if (/^h[1-3]$/.test(tag ?? "")) type = "heading";
   else if (tag === "a") type = "button";
   else if (tag === "img") type = "image";
   else if (tag === "svg") type = "icon";
-  else if (tag === "hr") type = "divider";
   else throw new Error(`Block ${index + 1} uses unsupported <${tag ?? "unknown"}> content.`);
 
   const innerStyle = inner ? styleObject(inner) : {};
@@ -282,9 +282,17 @@ function blockFromFrame(frame: AstNode, index: number): TemplateBlock {
   };
 
   if (type === "heading" || type === "text" || type === "button") {
-    const text = jsxElementText(inner!);
+    const text = inner ? jsxElementText(inner) : "";
     if (text === null) throw new Error(`Block ${index + 1} contains an unsupported text expression.`);
     block.text = text;
+  }
+  if (isLegacyDivider) {
+    const dividerBorder = borderParts(innerStyle.borderTop);
+    block.style.padding = 0;
+    if (dividerBorder.width > 0) {
+      block.style.borderWidth = dividerBorder.width;
+      block.style.borderColor = dividerBorder.color;
+    }
   }
   if (type === "heading") block.level = Number(tag?.slice(1)) as 1 | 2 | 3;
   if (type === "button") block.href = jsxAttributeValue(inner!, "href") ?? "#";
@@ -421,14 +429,14 @@ function htmlBlockFromFrame(frame: Element, index: number): TemplateBlock {
   if (children.length > 1) throw new Error(`Block ${index + 1} has an unsupported nested structure.`);
   const inner = children[0] ?? null;
   const tag = inner?.localName ?? null;
+  const isLegacyDivider = tag === "hr";
   let type: BlockType;
-  if (!inner) type = "spacer";
+  if (!inner || isLegacyDivider) type = "text";
   else if (tag === "p") type = "text";
   else if (/^h[1-3]$/.test(tag ?? "")) type = "heading";
   else if (tag === "a") type = "button";
   else if (tag === "img") type = "image";
   else if (tag === "svg") type = "icon";
-  else if (tag === "hr") type = "divider";
   else throw new Error(`Block ${index + 1} uses unsupported <${tag ?? "unknown"}> content.`);
 
   const innerStyle = inner ? htmlStyle(inner) : {};
@@ -444,7 +452,15 @@ function htmlBlockFromFrame(frame: Element, index: number): TemplateBlock {
   };
 
   if (type === "heading" || type === "text" || type === "button") {
-    block.text = inner!.textContent ?? "";
+    block.text = inner?.textContent ?? "";
+  }
+  if (isLegacyDivider) {
+    const dividerBorder = borderParts(innerStyle.borderTop);
+    block.style.padding = 0;
+    if (dividerBorder.width > 0) {
+      block.style.borderWidth = dividerBorder.width;
+      block.style.borderColor = dividerBorder.color;
+    }
   }
   if (type === "heading") block.level = Number(tag?.slice(1)) as 1 | 2 | 3;
   if (type === "button") block.href = inner!.getAttribute("href") ?? "#";

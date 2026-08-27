@@ -10,10 +10,13 @@ import SandboxedCodePreview, {
 import AccessibleDialog from "@/components/ui/accessible-dialog";
 import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
 
-const LANGS: { value: CodeLang; label: string; icon: string }[] = [
+const LANGS: {
+  value: Exclude<CodeLang, "angular">;
+  label: string;
+  icon: string;
+}[] = [
   { value: "html", label: "HTML", icon: "code-xml" },
   { value: "react", label: "React", icon: "atom" },
-  { value: "angular", label: "Angular", icon: "triangle" },
 ];
 
 export default function CodeEditorPanel({
@@ -95,6 +98,20 @@ export default function CodeEditorPanel({
                 {language.label}
               </button>
             ))}
+            <button
+              type="button"
+              role="tab"
+              id="code-tab-angular"
+              aria-selected="false"
+              aria-disabled="true"
+              disabled
+              tabIndex={-1}
+              className="flex min-h-11 shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-zinc-400 opacity-60 dark:text-zinc-500 sm:min-h-9"
+            >
+              <EditorIcon name="triangle" className="size-3.5" />
+              <span>Angular</span>
+              <span className="text-[10px] font-normal">Coming soon</span>
+            </button>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-1">

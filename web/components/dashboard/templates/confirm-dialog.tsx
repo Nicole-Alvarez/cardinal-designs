@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import AccessibleDialog from "@/components/ui/accessible-dialog";
+import { Button } from "@/components/ui/button";
 import { EditorIcon } from "./editor-controls";
 
 export default function ConfirmDialog({
@@ -33,7 +34,7 @@ export default function ConfirmDialog({
       describedBy="confirm-dialog-description"
       initialFocusRef={cancelRef}
       closeOnBackdrop={!loading}
-      panelClassName="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
+      panelClassName="w-full max-w-md rounded-2xl border border-border-subtle bg-surface-1 p-5 text-text-primary shadow-2xl"
     >
         <div className="flex items-start gap-3">
           <span
@@ -51,38 +52,34 @@ export default function ConfirmDialog({
           <div className="min-w-0 flex-1">
             <h2
               id="confirm-dialog-title"
-              className="text-base font-semibold text-zinc-900 dark:text-zinc-50"
+              className="text-base font-semibold text-text-primary"
             >
               {title}
             </h2>
-            <p id="confirm-dialog-description" className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p id="confirm-dialog-description" className="mt-1 text-sm text-text-secondary">
               {description}
             </p>
           </div>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <button
+          <Button
             ref={cancelRef}
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="min-h-11 rounded-lg px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            variant="ghost"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`min-h-11 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:focus-visible:ring-offset-zinc-900 ${
-              confirmVariant === "danger"
-                ? "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
-                : "bg-zinc-950 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
-            }`}
+            variant={confirmVariant === "danger" ? "destructive" : "primary"}
           >
             {loading ? "Processing..." : confirmLabel}
-          </button>
+          </Button>
         </div>
     </AccessibleDialog>
   );

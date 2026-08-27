@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import CodeEditorPanel from "./code-editor-panel";
 
@@ -44,5 +45,27 @@ describe("CodeEditorPanel preview isolation", () => {
     const frame = screen.getByTitle("React template preview");
     expect(frame).toHaveAttribute("sandbox", "allow-scripts");
     expect(screen.queryByText("Untrusted React")).not.toBeInTheDocument();
+  });
+
+  it("shows Angular as unavailable and skips it during keyboard navigation", async () => {
+    const user = userEvent.setup();
+    const onLangChange = vi.fn();
+    render(
+      <CodeEditorPanel
+        {...baseProps}
+        onLangChange={onLangChange}
+        lang="react"
+        code="export default function Template() { return null; }"
+      />
+    );
+
+    const angular = screen.getByRole("tab", { name: /Angular.*Coming soon/i });
+    expect(angular).toBeDisabled();
+    expect(angular).toHaveAttribute("aria-disabled", "true");
+    expect(angular).toHaveAttribute("tabindex", "-1");
+
+    screen.getByRole("tab", { name: "React" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(onLangChange).toHaveBeenLastCalledWith("html");
   });
 });

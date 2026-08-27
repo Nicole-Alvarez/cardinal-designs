@@ -6,13 +6,12 @@ import { EditorIcon, EditorTooltip } from "./editor-controls";
 import PreviewExportActions from "./preview-export-actions";
 import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
 
-type Tab = "preview" | "html" | "react" | "angular";
+type Tab = "preview" | "html" | "react";
 
 const OUTPUT_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "preview", label: "Preview", icon: "eye" },
   { id: "html", label: "HTML", icon: "code-xml" },
   { id: "react", label: "React", icon: "atom" },
-  { id: "angular", label: "Angular", icon: "triangle" },
 ];
 
 export default function CodeOutput({
@@ -20,7 +19,6 @@ export default function CodeOutput({
   html,
   previewHtml,
   reactCode,
-  angularCode,
 }: {
   title: string;
   html: string;
@@ -33,8 +31,7 @@ export default function CodeOutput({
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
 
-  const code =
-    tab === "html" ? html : tab === "react" ? reactCode : angularCode;
+  const code = tab === "html" ? html : reactCode;
 
   async function handleCopy() {
     setCopyError(null);
@@ -99,6 +96,20 @@ export default function CodeOutput({
               {outputTab.label}
             </button>
           ))}
+          <button
+            type="button"
+            role="tab"
+            id="output-tab-angular"
+            aria-selected="false"
+            aria-disabled="true"
+            disabled
+            tabIndex={-1}
+            className="flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-400 opacity-60 dark:text-zinc-500"
+          >
+            <EditorIcon name="triangle" className="size-3.5" />
+            <span>Angular</span>
+            <span className="text-[10px] font-normal">Coming soon</span>
+          </button>
         </div>
 
         <div className="ml-auto flex shrink-0 items-start">

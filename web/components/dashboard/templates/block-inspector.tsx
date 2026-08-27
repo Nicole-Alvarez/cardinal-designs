@@ -1,22 +1,28 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { isSquareBlock, type BlockStyle, type BlockType, type TemplateBlock } from "@/features/templates/types";
+import {
+  isLegacyBlockType,
+  isSquareBlock,
+  type AddableBlockType,
+  type BlockStyle,
+  type BlockType,
+  type TemplateBlock,
+} from "@/features/templates/types";
 import { uploadBlockImage } from "@/features/templates/queries";
 import { FONT_OPTIONS } from "@/features/templates/fonts";
+import Disclosure from "@/components/ui/disclosure";
 import { DraftNumberInput } from "./draft-inputs";
 import { ColorInput, Field } from "./inspector-controls";
-import IconPicker from "./icon-picker";
+import LazyIconPicker from "./lazy-icon-picker";
 import ImageSourceNotice from "./image-source-notice";
 
-const VARIANTS: { type: BlockType; label: string }[] = [
+const VARIANTS: { type: AddableBlockType; label: string }[] = [
   { type: "text", label: "Text" },
   { type: "heading", label: "Heading" },
   { type: "button", label: "Button" },
   { type: "image", label: "Image" },
   { type: "icon", label: "Icon" },
-  { type: "divider", label: "Divider" },
-  { type: "spacer", label: "Spacer" },
   { type: "qr", label: "QR Code" },
   { type: "barcode", label: "Barcode" },
 ];
@@ -84,6 +90,11 @@ export default function BlockInspector({
           }}
           className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
         >
+          {isLegacyBlockType(block.type) ? (
+            <option value={block.type}>
+              {block.type === "divider" ? "Divider" : "Spacer"} (legacy)
+            </option>
+          ) : null}
           {VARIANTS.map((variant) => (
             <option key={variant.type} value={variant.type}>
               {variant.label}
@@ -93,65 +104,40 @@ export default function BlockInspector({
       </Field>
 
       {block.type === "icon" && (
-        <IconPicker value={block.icon} onChange={(icon) => onChange({ icon })} />
+        <LazyIconPicker value={block.icon} onChange={(icon) => onChange({ icon })} />
       )}
 
-      <Field label="Position & size">
-        <div className={isSquareBlock(block.type) ? "grid grid-cols-3 gap-1" : "grid grid-cols-4 gap-1"}>
-          <GeometryInput label="X" value={block.x} onChange={(x) => onChange({ x })} />
-          <GeometryInput label="Y" value={block.y} onChange={(y) => onChange({ y })} />
-          {isSquareBlock(block.type) ? (
-            <GeometryInput
-              label="Size"
-              value={block.width}
-              min={16}
-              onChange={(size) => onChange({ width: size, height: size })}
-            />
-          ) : (
-            <>
+      <Disclosure title="Geometry" defaultOpen>
+        <Field label="Position & size">
+          <div className={isSquareBlock(block.type) ? "grid grid-cols-3 gap-1" : "grid grid-cols-4 gap-1"}>
+            <GeometryInput label="X" value={block.x} onChange={(x) => onChange({ x })} />
+            <GeometryInput label="Y" value={block.y} onChange={(y) => onChange({ y })} />
+            {isSquareBlock(block.type) ? (
               <GeometryInput
-                label="W"
+                label="Size"
                 value={block.width}
                 min={16}
-                onChange={(width) => onChange({ width })}
+                onChange={(size) => onChange({ width: size, height: size })}
               />
-              <GeometryInput
-                label="H"
-                value={block.height}
-                min={16}
-                onChange={(height) => onChange({ height })}
-              />
-            </>
-          )}
-        </div>
-      </Field>
-
-      <Field label="Stacking">
-        <div className="flex items-end gap-1">
-          <div className="w-16">
-            <GeometryInput
-              label="Z-index"
-              value={block.z}
-              min={0}
-              onChange={(z) => onChange({ z: Math.max(0, Math.round(z)) })}
-            />
+            ) : (
+              <>
+                <GeometryInput
+                  label="W"
+                  value={block.width}
+                  min={16}
+                  onChange={(width) => onChange({ width })}
+                />
+                <GeometryInput
+                  label="H"
+                  value={block.height}
+                  min={16}
+                  onChange={(height) => onChange({ height })}
+                />
+              </>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => onStack("front")}
-            className="flex-1 rounded-lg border border-zinc-200 px-2 py-2 text-xs text-zinc-500 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Front
-          </button>
-          <button
-            type="button"
-            onClick={() => onStack("back")}
-            className="flex-1 rounded-lg border border-zinc-200 px-2 py-2 text-xs text-zinc-500 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Back
-          </button>
-        </div>
-      </Field>
+        </Field>
+      </Disclosure>
 
       {(block.type === "heading" || block.type === "text" || block.type === "button") && (
         <Field label={block.type === "heading" ? "Heading text" : block.type === "button" ? "Button label" : "Text"}>
@@ -254,8 +240,8 @@ export default function BlockInspector({
         </Field>
       )}
 
-      {block.type !== "spacer" && (
-        <>
+      <Disclosure title="Appearance" defaultOpen>
+        {block.type !== "spacer" ? (
           <Field label="Text color">
             <ColorInput
               value={block.style.color}
@@ -263,8 +249,9 @@ export default function BlockInspector({
               onChange={(color) => onStyleChange({ color })}
             />
           </Field>
-          {(block.type === "heading" || block.type === "text" || block.type === "button") && (
-            <>
+        ) : null}
+        {(block.type === "heading" || block.type === "text" || block.type === "button") && (
+          <>
               <Field label="Font size">
                 <div className="flex items-center gap-2">
                   <input
@@ -373,71 +360,33 @@ export default function BlockInspector({
                   />
                 </div>
               </Field>
-            </>
-          )}
-          <Field label="Background">
-            <ColorInput
-              value={block.style.backgroundColor}
-              allowTransparent
-              onChange={(backgroundColor) => onStyleChange({ backgroundColor })}
-            />
-          </Field>
-          {block.type !== "image" && (
-            <Field label="Padding">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={0}
-                  max={48}
-                  value={block.style.padding}
-                  onChange={(e) => onStyleChange({ padding: Number(e.target.value) })}
-                  className="flex-1 accent-zinc-900 dark:accent-zinc-100"
-                />
-                <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                  {block.style.padding}px
-                </span>
-              </div>
-            </Field>
-          )}
-          <Field label="Border width">
+          </>
+        )}
+        <Field label="Background">
+          <ColorInput
+            value={block.style.backgroundColor}
+            allowTransparent
+            onChange={(backgroundColor) => onStyleChange({ backgroundColor })}
+          />
+        </Field>
+        {block.type !== "image" && (
+          <Field label="Padding">
             <div className="flex items-center gap-2">
               <input
                 type="range"
                 min={0}
-                max={16}
-                value={block.style.borderWidth}
-                onChange={(e) => onStyleChange({ borderWidth: Number(e.target.value) })}
+                max={48}
+                value={block.style.padding}
+                onChange={(e) => onStyleChange({ padding: Number(e.target.value) })}
                 className="flex-1 accent-zinc-900 dark:accent-zinc-100"
               />
               <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                {block.style.borderWidth}px
+                {block.style.padding}px
               </span>
             </div>
           </Field>
-          {block.style.borderWidth > 0 && (
-            <Field label="Border color">
-              <ColorInput
-                value={block.style.borderColor}
-                onChange={(borderColor) => onStyleChange({ borderColor })}
-              />
-            </Field>
-          )}
-          <Field label="Corner radius">
-            <div className="flex items-center gap-2">
-              <DraftNumberInput
-                min={0}
-                max={48}
-                integer
-                value={block.style.borderRadius}
-                onCommit={(borderRadius) => onStyleChange({ borderRadius })}
-                aria-label="Corner radius in pixels"
-                className="w-full rounded-md border border-zinc-300 bg-transparent px-1 py-1 text-center text-xs focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
-              />
-              <span className="w-12 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                {block.style.borderRadius}px
-              </span>
-            </div>
-          </Field>
+        )}
+        {block.type !== "spacer" ? (
           <Field label="Align">
             <div className="grid grid-cols-3 gap-1">
               {(["left", "center", "right"] as const).map((align) => (
@@ -457,8 +406,76 @@ export default function BlockInspector({
               ))}
             </div>
           </Field>
-        </>
-      )}
+        ) : null}
+      </Disclosure>
+
+      <Disclosure title="Advanced">
+        <Field label="Stacking">
+          <div className="flex items-end gap-1">
+            <div className="w-16">
+              <GeometryInput
+                label="Z-index"
+                value={block.z}
+                min={0}
+                onChange={(z) => onChange({ z: Math.max(0, Math.round(z)) })}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => onStack("front")}
+              className="min-h-11 flex-1 rounded-lg border border-border-subtle px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-surface-2"
+            >
+              Front
+            </button>
+            <button
+              type="button"
+              onClick={() => onStack("back")}
+              className="min-h-11 flex-1 rounded-lg border border-border-subtle px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-surface-2"
+            >
+              Back
+            </button>
+          </div>
+        </Field>
+        <Field label="Border width">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={16}
+              value={block.style.borderWidth}
+              onChange={(e) => onStyleChange({ borderWidth: Number(e.target.value) })}
+              className="flex-1 accent-accent"
+            />
+            <span className="w-12 text-right text-xs text-text-muted">
+              {block.style.borderWidth}px
+            </span>
+          </div>
+        </Field>
+        {block.style.borderWidth > 0 ? (
+          <Field label="Border color">
+            <ColorInput
+              value={block.style.borderColor}
+              onChange={(borderColor) => onStyleChange({ borderColor })}
+            />
+          </Field>
+        ) : null}
+        <Field label="Corner radius">
+          <div className="flex items-center gap-2">
+            <DraftNumberInput
+              min={0}
+              max={48}
+              integer
+              value={block.style.borderRadius}
+              onCommit={(borderRadius) => onStyleChange({ borderRadius })}
+              aria-label="Corner radius in pixels"
+              className="w-full rounded-md border border-border-subtle bg-transparent px-1 py-1 text-center text-xs focus:border-border-strong focus:outline-none"
+            />
+            <span className="w-12 text-right text-xs text-text-muted">
+              {block.style.borderRadius}px
+            </span>
+          </div>
+        </Field>
+      </Disclosure>
     </div>
   );
 }

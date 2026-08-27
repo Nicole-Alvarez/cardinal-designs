@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { CARDINAL_BLOCK_MIME } from "@/features/templates/drag-types";
-import { DEFAULT_CANVAS } from "@/features/templates/types";
+import { CARDINAL_BLOCK_MIME, blockDragPayload } from "@/features/templates/drag-types";
+import { createUniversalBlock, DEFAULT_CANVAS } from "@/features/templates/types";
 import EditorCanvas from "./editor-canvas";
 
 let resizeObserverCallback: ResizeObserverCallback | undefined;
@@ -48,7 +48,19 @@ describe("EditorCanvas drag-to-add", () => {
     render(<EditorCanvas {...props} />);
 
     const dropLayer = screen.getByTestId("canvas-drop-layer");
-    const values = new Map([[CARDINAL_BLOCK_MIME, "new"]]);
+    const values = new Map([[CARDINAL_BLOCK_MIME, blockDragPayload("qr")]]);
+    fireEvent.drop(dropLayer, {
+      clientX: 100,
+      clientY: 80,
+      dataTransfer: {
+        types: [CARDINAL_BLOCK_MIME],
+        getData: (type: string) => values.get(type) ?? "",
+      },
+    });
+    expect(onAddAt).toHaveBeenCalledTimes(1);
+    expect(onAddAt).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number), "qr");
+
+    values.set(CARDINAL_BLOCK_MIME, "new:unsupported");
     fireEvent.drop(dropLayer, {
       clientX: 100,
       clientY: 80,
@@ -62,7 +74,7 @@ describe("EditorCanvas drag-to-add", () => {
     fireEvent.drop(dropLayer, {
       clientX: 100,
       clientY: 80,
-      dataTransfer: { types: ["text/plain"], getData: () => "new" },
+      dataTransfer: { types: ["text/plain"], getData: () => blockDragPayload("text") },
     });
     expect(onAddAt).toHaveBeenCalledTimes(1);
   });
@@ -330,5 +342,25 @@ describe("EditorCanvas drag-to-add", () => {
 
     expect(fireEvent.contextMenu(viewport)).toBe(false);
     expect(fireEvent.contextMenu(document.body)).toBe(true);
+  });
+
+  it("uses the shared icon and readable destructive hover contrast", () => {
+    const block = createUniversalBlock(20, 20, "text", 0);
+    render(
+      <EditorCanvas
+        canvas={{ ...DEFAULT_CANVAS, width: "400px", height: "240px" }}
+        blocks={[block]}
+        selectedIds={[block.id]}
+        onSelect={vi.fn()}
+        onMove={vi.fn()}
+        onResize={vi.fn()}
+        onAddAt={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    const remove = screen.getByRole("button", { name: "Delete block" });
+    expect(remove.querySelector("svg")).not.toBeNull();
+    expect(remove).toHaveClass("dark:hover:text-white");
   });
 });

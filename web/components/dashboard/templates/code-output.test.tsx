@@ -52,4 +52,28 @@ describe("CodeOutput tabs", () => {
       "Clipboard access was denied."
     );
   });
+
+  it("shows Angular as unavailable and excludes it from tab navigation", async () => {
+    const user = userEvent.setup();
+    render(
+      <CodeOutput
+        title="Member card"
+        html="<div>HTML output</div>"
+        previewHtml={["<div>Preview</div>"]}
+        reactCode="export default function Card() {}"
+        angularCode="export class Card {}"
+      />
+    );
+
+    const angular = screen.getByRole("tab", { name: /Angular.*Coming soon/i });
+    expect(angular).toBeDisabled();
+    expect(angular).toHaveAttribute("aria-disabled", "true");
+    expect(angular).toHaveAttribute("tabindex", "-1");
+
+    const react = screen.getByRole("tab", { name: "React" });
+    react.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Preview" })).toHaveFocus();
+    expect(screen.queryByText("export class Card {}")).not.toBeInTheDocument();
+  });
 });

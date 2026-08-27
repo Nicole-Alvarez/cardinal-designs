@@ -9,15 +9,18 @@ import CodeOutput from "@/components/dashboard/templates/code-output";
 import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
 import {
   EditorIcon,
-  EditorTooltip,
 } from "@/components/dashboard/templates/editor-controls";
 import EditorCanvas from "@/components/dashboard/templates/editor-canvas";
 import EditorCommands from "@/components/dashboard/templates/editor-commands";
-import { DraftTextInput } from "@/components/dashboard/templates/draft-inputs";
+import EditorToolbar from "@/components/dashboard/templates/editor-toolbar";
 import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
+import MobileEditorActions, {
+  type MobileEditorAction,
+} from "@/components/dashboard/templates/mobile-editor-actions";
+import OutputDrawer from "@/components/dashboard/templates/output-drawer";
 import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
 import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
-import TemplateEditorFooter from "@/components/dashboard/templates/template-editor-footer";
+import WorkspaceSheet from "@/components/dashboard/templates/workspace-sheet";
 import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
@@ -38,6 +41,7 @@ import {
   parseContent,
   workingCanvasSize,
   type BlockStyle,
+  type BlockType,
   type CodeLang,
   type CanvasSummary,
   type TemplateBlock,
@@ -68,6 +72,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [previewMetadata, setPreviewMetadata] = useState<TemplateMetadata>([]);
   const [metadataOpen, setMetadataOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [outputOpen, setOutputOpen] = useState(false);
+  const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
   const [lang, setLang] = useState<CodeLang>("html");
@@ -154,9 +160,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       react: c.react ?? "",
       angular: c.angular ?? "",
     });
-    setLang(
-      c.html ? "html" : c.react ? "react" : c.angular ? "angular" : "html"
-    );
+    setLang(c.html ? "html" : c.react ? "react" : "html");
   }, []);
 
   const loadTemplate = useCallback(async () => {
@@ -222,24 +226,24 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setDirty(true);
   }
 
-  function addBlockCentered() {
+  function addBlockCentered(type: BlockType) {
     const size = workingCanvasSize(canvas);
-    checkpoint("add");
-    const block = createUniversalBlock(
-      (size.width - 280) / 2,
-      (size.height - 44) / 2,
-      "text",
-      nextZ()
-    );
+    checkpoint(`add:${type}`);
+    const draft = createUniversalBlock(0, 0, type, nextZ());
+    const block = {
+      ...draft,
+      x: Math.round((size.width - draft.width) / 2),
+      y: Math.round((size.height - draft.height) / 2),
+    };
     setBlocks((prev) => [...prev, block]);
     setSelectedIds([block.id]);
     setPanelTab("block");
     markDirty();
   }
 
-  function addBlockAt(x: number, y: number) {
-    checkpoint("add");
-    const draft = createUniversalBlock(0, 0, "text", nextZ());
+  function addBlockAt(x: number, y: number, type: BlockType) {
+    checkpoint(`add:${type}`);
+    const draft = createUniversalBlock(0, 0, type, nextZ());
     const block = {
       ...draft,
       x: Math.round(x - draft.width / 2),
@@ -268,6 +272,15 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   function handleSelectAll() {
     setSelectedIds((prev) => (prev.length === blocks.length ? [] : blocks.map((block) => block.id)));
     setPanelTab(blocks.length === 1 ? "block" : "canvas");
+  }
+
+  function handleMobileAction(action: MobileEditorAction) {
+    if (action === "preview") {
+      setMobileAction("preview");
+      return;
+    }
+    setPanelTab(action === "add" ? "commands" : action);
+    setMobileAction(action);
   }
 
   function handleMove(id: string, x: number, y: number) {
@@ -646,43 +659,29 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     <>
       <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-3 px-2 sm:px-4 lg:h-dvh lg:min-h-0 lg:overflow-hidden lg:px-0">
         {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
-        <header className="sticky top-0 z-40 shrink-0 overflow-visible rounded-2xl border border-zinc-200 bg-white/95 shadow-md backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-          <div
-            role="toolbar"
-            aria-label="Template editor toolbar"
-            className="flex flex-wrap items-center gap-2 p-2.5"
-          >
-            <EditorTooltip label="Back to templates" align="left">
-              <Link
-                href="/dashboard/templates"
-                aria-label="Back to templates"
-                className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 sm:size-9"
-              >
-                <EditorIcon name="arrow-left" />
-              </Link>
-            </EditorTooltip>
-
-            <span className="hidden h-10 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
-
-            <div className="min-w-0 basis-52 flex-1">
-              <DraftTextInput
-                value={title}
-                required
-                onCommit={handleRename}
-                aria-label="Template title"
-                className="block w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-lg font-semibold tracking-tight text-zinc-950 transition-colors hover:border-zinc-200 focus-visible:border-zinc-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-zinc-50 dark:hover:border-zinc-700 dark:focus-visible:border-zinc-600 dark:focus-visible:bg-zinc-950"
-              />
-              <input
-                value={description}
-                onChange={(event) => handleDescriptionChange(event.target.value)}
-                maxLength={500}
-                aria-label="Template description"
-                placeholder="Add a short description"
-                className="block w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-zinc-500 transition-colors placeholder:text-zinc-400 hover:border-zinc-200 focus-visible:border-zinc-300 focus-visible:bg-white focus-visible:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-zinc-400 dark:placeholder:text-zinc-500 dark:hover:border-zinc-700 dark:focus-visible:border-zinc-600 dark:focus-visible:bg-zinc-950 dark:focus-visible:text-zinc-200"
-              />
-            </div>
-
-            {canvases.length > 0 && activeCanvasId && (
+        <EditorToolbar
+          title={title}
+          description={description}
+          mode={mode}
+          canUndo={mode === "code" ? codeHistory.canUndo : history.canUndo}
+          canRedo={mode === "code" ? codeHistory.canRedo : history.canRedo}
+          canSelectAll={mode === "wysiwyg" && blocks.length > 0}
+          allSelected={blocks.length > 0 && selectedIds.length === blocks.length}
+          previewDataCount={metadataFieldCount(previewMetadata)}
+          dirty={dirty}
+          saving={saving}
+          savedAt={savedAt}
+          onTitleCommit={handleRename}
+          onDescriptionChange={handleDescriptionChange}
+          onModeChange={setMode}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onSelectAll={handleSelectAll}
+          onPreviewData={() => setMetadataOpen(true)}
+          onSettings={() => setSettingsOpen(true)}
+          onSave={handleSave}
+          canvasSelector={
+            canvases.length > 0 && activeCanvasId ? (
               <CanvasSelector
                 canvases={canvases}
                 activeCanvasId={activeCanvasId}
@@ -692,111 +691,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 onRename={handleRenameCanvas}
                 onDelete={handleDeleteCanvasRequest}
               />
-            )}
-
-          <div className="flex items-center rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
-            {(["wysiwyg", "code"] as const).map((m) => {
-              const visualMode = m === "wysiwyg";
-              return (
-                <EditorTooltip
-                  key={m}
-                  label={visualMode ? "Visual editor" : "Code editor"}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setMode(m)}
-                    aria-pressed={mode === m}
-                    className={
-                      "flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:min-h-9 " +
-                      (mode === m
-                        ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-700 dark:text-white"
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")
-                    }
-                  >
-                    <EditorIcon name={visualMode ? "layout-template" : "code-2"} />
-                    {visualMode ? "Visual" : "Code"}
-                  </button>
-                </EditorTooltip>
-              );
-            })}
-          </div>
-
-          <span className="hidden h-6 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
-
-          <EditorTooltip
-            label={
-              mode === "code"
-                ? "Select all is available in Visual mode"
-                : selectedIds.length === blocks.length && blocks.length > 0
-                ? "Clear block selection"
-                : "Select all blocks"
-            }
-          >
-            <button
-              type="button"
-              onClick={handleSelectAll}
-              disabled={mode === "code" || blocks.length === 0}
-              data-template-selection-preserving
-              aria-label={
-                mode === "code"
-                  ? "Select all is unavailable in Code mode"
-                  : selectedIds.length === blocks.length && blocks.length > 0
-                  ? "Clear block selection"
-                  : "Select all blocks"
-              }
-              className="grid size-11 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 sm:size-9"
-            >
-              <EditorIcon
-                name={
-                  selectedIds.length === blocks.length && blocks.length > 0
-                    ? "square-check"
-                    : "box-select"
-                }
-              />
-            </button>
-          </EditorTooltip>
-
-          <div className="flex items-center rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
-            <EditorTooltip label="Undo (⌘Z)">
-              <button
-                type="button"
-                onClick={handleUndo}
-                disabled={mode === "code" ? !codeHistory.canUndo : !history.canUndo}
-                className="min-h-11 rounded-lg px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:min-h-9"
-              >
-                Undo
-              </button>
-            </EditorTooltip>
-            <EditorTooltip label="Redo (⇧⌘Z)">
-              <button
-                type="button"
-                onClick={handleRedo}
-                disabled={mode === "code" ? !codeHistory.canRedo : !history.canRedo}
-                className="min-h-11 rounded-lg px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:min-h-9"
-              >
-                Redo
-              </button>
-            </EditorTooltip>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            <EditorTooltip label={saving ? "Saving template" : "Save template"} align="right">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex min-h-11 items-center gap-2 rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900 sm:min-h-9"
-              >
-                <EditorIcon
-                  name={saving ? "loader-circle" : "save"}
-                  className={`size-4 ${saving ? "animate-spin" : ""}`}
-                />
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </EditorTooltip>
-          </div>
-        </div>
-        </header>
+            ) : null
+          }
+        />
 
         <main className="space-y-6 px-0.5 py-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:scroll-smooth">
           {error && (
@@ -829,7 +726,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
             <aside
               data-template-selection-preserving
-              className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
+              className="hidden overflow-hidden rounded-xl border border-border-subtle bg-surface-1 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
             >
               <div
                 role="tablist"
@@ -876,14 +773,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
               >
                 {panelTab === "commands" && (
-                  <EditorCommands
-                    onAdd={addBlockCentered}
-                    onAddCanvas={handleAddCanvas}
-                    onSettings={() => setSettingsOpen(true)}
-                    onMetadata={() => setMetadataOpen(true)}
-                    metadataCount={metadataFieldCount(previewMetadata)}
-                    addingCanvas={creatingCanvas}
-                  />
+                  <EditorCommands onAdd={addBlockCentered} />
                 )}
                 {panelTab === "canvas" && (
                   <CanvasPanel canvas={canvas} onChange={patchCanvas} />
@@ -901,13 +791,20 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
             </aside>
           </div>
 
-              <CodeOutput
-                title={title}
-                html={generated.html}
-                previewHtml={generated.previewHtml}
-                reactCode={generated.react}
-                angularCode={generated.angular}
-              />
+              <OutputDrawer
+                open={outputOpen}
+                onOpenChange={setOutputOpen}
+                title="Preview and export"
+                className="hidden lg:block"
+              >
+                <CodeOutput
+                  title={title}
+                  html={generated.html}
+                  previewHtml={generated.previewHtml}
+                  reactCode={generated.react}
+                  angularCode={generated.angular}
+                />
+              </OutputDrawer>
             </>
           ) : (
             <CodeEditorPanel
@@ -923,16 +820,49 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           )}
         </main>
 
-        <TemplateEditorFooter
-          mode={mode}
-          lang={lang}
-          blockCount={blocks.length}
-          metadataRecordCount={previewMetadata.length}
-          dirty={dirty}
-          saving={saving}
-          savedAt={savedAt}
-        />
+        {mode === "wysiwyg" ? (
+          <MobileEditorActions active={mobileAction} onSelect={handleMobileAction} />
+        ) : null}
       </div>
+
+      {mode === "wysiwyg" ? (
+        <WorkspaceSheet
+          open={mobileAction !== null}
+          title={
+            mobileAction === "add"
+              ? "Add blocks"
+              : mobileAction === "block"
+                ? "Edit block"
+                : mobileAction === "canvas"
+                  ? "Canvas"
+                  : "Preview and export"
+          }
+          placement="bottom"
+          onClose={() => setMobileAction(null)}
+        >
+          {mobileAction === "add" ? (
+            <EditorCommands onAdd={addBlockCentered} />
+          ) : mobileAction === "block" ? (
+            <BlockInspector
+              block={selectedBlock}
+              selectedCount={selectedIds.length}
+              onChange={patchSelected}
+              onStyleChange={patchSelectedStyle}
+              onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
+            />
+          ) : mobileAction === "canvas" ? (
+            <CanvasPanel canvas={canvas} onChange={patchCanvas} />
+          ) : mobileAction === "preview" ? (
+            <CodeOutput
+              title={title}
+              html={generated.html}
+              previewHtml={generated.previewHtml}
+              reactCode={generated.react}
+              angularCode={generated.angular}
+            />
+          ) : null}
+        </WorkspaceSheet>
+      ) : null}
 
       <MetadataDialog
         open={metadataOpen}

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import AccessibleDialog from "@/components/ui/accessible-dialog";
+import { Button } from "@/components/ui/button";
 import { EditorIcon } from "./editor-controls";
 import { DraftTextInput } from "./draft-inputs";
 import ConfirmDialog from "./confirm-dialog";
@@ -57,28 +58,29 @@ function SettingsDialogContent({
         describedBy="settings-dialog-description"
         initialFocusRef={closeButtonRef}
         closeOnBackdrop={!saving}
-        panelClassName="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
+        panelClassName="w-full max-w-lg rounded-2xl border border-border-subtle bg-surface-1 p-5 text-text-primary shadow-2xl"
       >
         <div>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 id="settings-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              <h2 id="settings-dialog-title" className="text-lg font-semibold text-text-primary">
                 Template settings
               </h2>
-              <p id="settings-dialog-description" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p id="settings-dialog-description" className="mt-1 text-xs text-text-secondary">
                 Manage privacy, title, and description.
               </p>
             </div>
-            <button
+            <Button
               ref={closeButtonRef}
               type="button"
               onClick={onClose}
               disabled={saving}
               aria-label="Close settings"
-              className="grid size-11 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              variant="ghost"
+              size="icon"
             >
               <EditorIcon name="x" className="size-4" />
-            </button>
+            </Button>
           </div>
 
           <div className="mt-5 space-y-4">
@@ -91,7 +93,7 @@ function SettingsDialogContent({
                 required
                 onCommit={setEditTitle}
                 aria-label="Template title"
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-100"
+                className="mt-1 block min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-sm text-text-primary outline-none focus:border-border-strong focus:ring-2 focus:ring-focus"
               />
             </div>
 
@@ -106,7 +108,7 @@ function SettingsDialogContent({
                 rows={3}
                 aria-label="Template description"
                 placeholder="Add a short description"
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                className="mt-1 block w-full rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-border-strong focus:ring-2 focus:ring-focus"
               />
             </div>
 
@@ -119,10 +121,10 @@ function SettingsDialogContent({
                   type="button"
                   onClick={() => handlePrivacyToggle(true)}
                   aria-pressed={editIsPrivate}
-                  className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
+                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     editIsPrivate
-                      ? "border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-border-subtle bg-surface-2 text-text-secondary hover:border-border-strong"
                   }`}
                 >
                   <EditorIcon name="lock" className="size-4" />
@@ -132,10 +134,10 @@ function SettingsDialogContent({
                   type="button"
                   onClick={() => handlePrivacyToggle(false)}
                   aria-pressed={!editIsPrivate}
-                  className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
+                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     !editIsPrivate
-                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm dark:border-emerald-500 dark:bg-emerald-500"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-border-subtle bg-surface-2 text-text-secondary hover:border-border-strong"
                   }`}
                 >
                   <EditorIcon name="globe" className="size-4" />
@@ -151,22 +153,21 @@ function SettingsDialogContent({
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              variant="ghost"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="min-h-11 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
             >
               {saving ? "Saving…" : "Save settings"}
-            </button>
+            </Button>
           </div>
         </div>
       </AccessibleDialog>

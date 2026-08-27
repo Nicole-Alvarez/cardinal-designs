@@ -54,7 +54,7 @@ export default function CanvasPanel({
             );
             if (preset) onChange({ width: preset.width, height: preset.height });
           }}
-          className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
+          className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-2 text-sm text-text-primary outline-none focus:border-border-strong focus:ring-2 focus:ring-focus"
         >
           <option value="custom">Custom</option>
           {CANVAS_PRESETS.map((group) => (
@@ -101,7 +101,7 @@ export default function CanvasPanel({
             value={canvas.overlayImage}
             onChange={(e) => onChange({ overlayImage: e.target.value })}
             placeholder="https://... (transparent PNG works best)"
-            className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
+            className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-border-strong focus:ring-2 focus:ring-focus"
           />
           <ImageSourceNotice source={canvas.overlayImage} />
         </div>
@@ -113,7 +113,7 @@ export default function CanvasPanel({
             <select
               value={canvas.overlayFit}
               onChange={(e) => onChange({ overlayFit: e.target.value as "cover" | "contain" })}
-              className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
+              className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-2 text-sm text-text-primary outline-none focus:border-border-strong focus:ring-2 focus:ring-focus"
             >
               <option value="cover">Cover</option>
               <option value="contain">Contain</option>
@@ -127,9 +127,9 @@ export default function CanvasPanel({
                 max={100}
                 value={canvas.overlayOpacity}
                 onChange={(e) => onChange({ overlayOpacity: Number(e.target.value) })}
-                className="flex-1 accent-zinc-900 dark:accent-zinc-100"
+                className="flex-1 accent-accent"
               />
-              <span className="w-10 text-right text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="w-10 text-right text-xs text-text-muted">
                 {canvas.overlayOpacity}%
               </span>
             </div>
@@ -157,9 +157,9 @@ export default function CanvasPanel({
             max={16}
             value={canvas.borderWidth}
             onChange={(e) => onChange({ borderWidth: Number(e.target.value) })}
-            className="flex-1 accent-zinc-900 dark:accent-zinc-100"
+            className="flex-1 accent-accent"
           />
-          <span className="w-10 text-right text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="w-10 text-right text-xs text-text-muted">
             {canvas.borderWidth}px
           </span>
         </div>
@@ -181,9 +181,9 @@ export default function CanvasPanel({
             max={48}
             value={canvas.borderRadius}
             onChange={(e) => onChange({ borderRadius: Number(e.target.value) })}
-            className="flex-1 accent-zinc-900 dark:accent-zinc-100"
+            className="flex-1 accent-accent"
           />
-          <span className="w-10 text-right text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="w-10 text-right text-xs text-text-muted">
             {canvas.borderRadius}px
           </span>
         </div>

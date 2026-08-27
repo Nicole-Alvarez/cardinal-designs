@@ -137,7 +137,15 @@ export default function BlockPreview({ block }: { block: TemplateBlock }) {
     case "divider":
       return (
         <div style={DIVIDER_STYLE}>
-          <hr className="w-full border-t border-zinc-300 dark:border-zinc-700" />
+          <hr
+            style={{
+              border: "none",
+              borderTop: "1px solid currentColor",
+              margin: 0,
+              opacity: 0.2,
+              width: "100%",
+            }}
+          />
         </div>
       );
     case "spacer":

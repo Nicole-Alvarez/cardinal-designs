@@ -1,4 +1,4 @@
-import { DEFAULT_ICON_NAME } from "./icons";
+import { DEFAULT_ICON_NAME } from "./icon-constants";
 
 export interface TemplateSummary {
   id: string;
@@ -32,16 +32,21 @@ export interface Canvas extends CanvasSummary {
  * Variant of a universal block. Every placed block is the same entity;
  * this only decides how it renders and which inspector fields show.
  */
-export type BlockType =
+export type AddableBlockType =
   | "heading"
   | "text"
   | "button"
   | "image"
   | "icon"
-  | "divider"
-  | "spacer"
   | "qr"
   | "barcode";
+
+export type LegacyBlockType = "divider" | "spacer";
+export type BlockType = AddableBlockType | LegacyBlockType;
+
+export function isLegacyBlockType(type: BlockType): type is LegacyBlockType {
+  return type === "divider" || type === "spacer";
+}
 
 export type CodeLang = "html" | "react" | "angular";
 
@@ -363,7 +368,7 @@ export function createUniversalBlock(
     case "divider":
       return { ...base, type, width: 220, height: 9, style: { ...defaultBlockStyle(), borderRadius: 0, padding: 4 } };
     case "spacer":
-      return { ...base, type, width: 140, height: 32, style: defaultBlockStyle() };
+      return { ...base, type, width: 280, height: 44, style: defaultBlockStyle() };
     case "icon":
       return {
         ...base,
