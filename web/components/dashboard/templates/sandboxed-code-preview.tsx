@@ -2,21 +2,24 @@
 
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useId,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import type { RenderedPreviewImage } from "@/features/templates/image-export";
+import { buildHtmlSandboxDocument } from "@/features/templates/html-sandbox-document";
+import { buildReactSandboxDocument } from "@/features/templates/react-sandbox-document";
 import type { TemplateMetadata } from "@/features/templates/types";
 import {
   isSandboxChildMessage,
   type SandboxPreviewMode,
-  type SandboxRenderMessage,
 } from "@/features/templates/sandbox-preview-messages";
 import { EditorIcon } from "./editor-controls";
+
+const PREVIEW_STARTUP_TIMEOUT_MS = 8_000;
 
 export interface SandboxedCodePreviewHandle {
   renderImages: (
@@ -49,20 +52,50 @@ const SandboxedCodePreview = forwardRef<SandboxedCodePreviewHandle, {
   const [ready, setReady] = useState(false);
   const [height, setHeight] = useState(240);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [reactDocument, setReactDocument] = useState<string>();
+  const htmlDocument = useMemo(
+    () => mode === "html" ? buildHtmlSandboxDocument(code, metadata, channel) : undefined,
+    [channel, code, metadata, mode]
+  );
 
-  const sendRender = useCallback(() => {
-    const target = frameRef.current?.contentWindow;
-    if (!target) return;
-    const message: SandboxRenderMessage = {
-      source: "cardinal-preview-parent",
-      type: "render",
-      channel,
-      mode,
-      code,
-      metadata,
+  const documentSource = mode === "html" ? htmlDocument : reactDocument;
+
+  useEffect(() => {
+    if (mode !== "react") {
+      setReactDocument(undefined);
+      return;
+    }
+    let cancelled = false;
+    setReactDocument(undefined);
+    const timer = window.setTimeout(() => {
+      void buildReactSandboxDocument(code, metadata, channel)
+        .then((document) => {
+          if (!cancelled) setReactDocument(document);
+        })
+        .catch((reason: unknown) => {
+          if (cancelled) return;
+          setError(reason instanceof Error ? reason.message : "Could not compile preview.");
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-    target.postMessage(message, "*");
-  }, [channel, code, metadata, mode]);
+  }, [channel, code, metadata, mode, reloadKey]);
+
+  useEffect(() => {
+    setReady(false);
+    setError(null);
+  }, [code, metadata, mode]);
+
+  useEffect(() => {
+    if (ready || error) return;
+    const timeout = window.setTimeout(() => {
+      setError("The isolated preview did not start. Try reloading it.");
+    }, PREVIEW_STARTUP_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [error, ready, reloadKey]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -71,7 +104,6 @@ const SandboxedCodePreview = forwardRef<SandboxedCodePreviewHandle, {
       if (event.data.type === "ready") {
         setReady(true);
         setError(null);
-        sendRender();
       } else if (event.data.type === "height") {
         setHeight(Math.min(Math.max(event.data.height, 160), 512));
       } else if (event.data.type === "rendered") {
@@ -89,7 +121,7 @@ const SandboxedCodePreview = forwardRef<SandboxedCodePreviewHandle, {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [channel, sendRender]);
+  }, [channel]);
 
   useEffect(() => {
     const pending = pendingExports.current;
@@ -128,21 +160,22 @@ const SandboxedCodePreview = forwardRef<SandboxedCodePreviewHandle, {
     },
   }), [channel, ready]);
 
-  useEffect(() => {
-    if (ready) sendRender();
-  }, [ready, sendRender]);
-
   const label = mode === "react" ? "React" : "HTML";
 
   return (
     <div className="relative min-h-40 overflow-hidden bg-white">
       <iframe
+        key={`${mode}-${reloadKey}`}
         ref={frameRef}
         title={`${label} template preview`}
-        src={`/preview-sandbox#${encodeURIComponent(channel)}`}
+        srcDoc={documentSource}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
-        onLoad={sendRender}
+        onLoad={() => {
+          if (documentSource) {
+            setReady(true);
+          }
+        }}
         style={{ height }}
         className="block w-full border-0 bg-white"
       />
@@ -158,10 +191,21 @@ const SandboxedCodePreview = forwardRef<SandboxedCodePreviewHandle, {
       {error && (
         <div
           role="alert"
-          className="absolute inset-x-0 top-0 flex items-start gap-2 bg-red-50 p-4 text-xs leading-5 text-red-700"
+          className="absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 bg-red-50 p-4 text-xs leading-5 text-red-700"
         >
-          <EditorIcon name="circle-alert" className="mt-0.5 size-4 shrink-0" />
-          <span className="break-words">{error}</span>
+          <EditorIcon name="circle-alert" className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 break-words">{error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setReady(false);
+              setError(null);
+              setReloadKey((value) => value + 1);
+            }}
+            className="min-h-9 rounded-lg border border-red-200 bg-white px-3 font-medium text-red-700 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          >
+            Retry preview
+          </button>
         </div>
       )}
     </div>
