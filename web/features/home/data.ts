@@ -6,7 +6,7 @@ export const sampleCards: Card[] = [
     name: "Aurora Greeting",
     description: "A soft gradient greeting card for any warm occasion.",
     tags: ["birthday", "greeting"],
-    gradient: "from-violet-400 via-purple-500 to-pink-500",
+    gradient: "from-cyan-400 via-sky-500 to-blue-700",
   },
   {
     id: "golden-anniversary",
@@ -48,7 +48,7 @@ export const sampleCards: Card[] = [
     name: "Rose Valentine",
     description: "Romantic rose tones for love letters and valentines.",
     tags: ["valentine", "romantic"],
-    gradient: "from-rose-300 via-pink-400 to-fuchsia-500",
+    gradient: "from-red-400 via-rose-500 to-amber-400",
   },
   {
     id: "charcoal-minimal",

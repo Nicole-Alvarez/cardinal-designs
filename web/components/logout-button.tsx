@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buttonClassName } from "@/components/ui/button";
 
 export default function LogoutButton() {
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export default function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+      className={buttonClassName("secondary", "default", "w-full")}
     >
       {loading ? "Signing out..." : "Log out"}
     </button>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import AppSidebar from "./app-sidebar";
 import type { Role } from "@/lib/roles";
 import AccessibleDialog from "@/components/ui/accessible-dialog";
+import { buttonClassName } from "@/components/ui/button";
 
 interface AppShellProps {
   user: { username: string; name: string | null; role: Role };
@@ -14,18 +15,18 @@ export default function AppShell({ user, children }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-64 shrink-0 border-r border-zinc-200 dark:border-zinc-800 md:block">
+    <div className="flex min-h-screen bg-app text-text-primary">
+      <aside className="hidden w-64 shrink-0 border-r border-border-subtle bg-surface-1 md:block">
         <AppSidebar user={user} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 md:hidden">
+        <header className="flex items-center gap-3 border-b border-border-subtle bg-surface-1 px-4 py-3 md:hidden">
           <button
             type="button"
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
-            className="grid size-11 place-items-center rounded-lg text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className={buttonClassName("ghost", "icon")}
           >
             <svg
               width="20"
@@ -39,7 +40,9 @@ export default function AppShell({ user, children }: AppShellProps) {
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
-          <span className="text-sm font-semibold tracking-tight">cardinal-designs</span>
+          <span className="text-sm font-semibold tracking-tight text-text-primary">
+            cardinal-designs
+          </span>
         </header>
 
         <main className="flex-1 p-4 sm:p-6">{children}</main>
@@ -50,7 +53,7 @@ export default function AppShell({ user, children }: AppShellProps) {
         onClose={() => setMenuOpen(false)}
         labelledBy="mobile-navigation-title"
         overlayClassName="items-stretch justify-start p-0 md:hidden"
-        panelClassName="h-full w-72 max-w-[88vw] bg-white shadow-2xl dark:bg-zinc-900"
+        panelClassName="h-full w-72 max-w-[88vw] bg-surface-1 shadow-[16px_0_48px_rgba(0,0,0,0.35)]"
       >
         <aside className="h-full">
           <AppSidebar
