@@ -45,7 +45,7 @@ export default function TemplateEditorFooter({
           };
 
   return (
-    <footer className="sticky bottom-0 z-30 shrink-0 rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_-18px_rgba(0,0,0,0.45)] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+    <footer className="shrink-0 rounded-2xl border border-zinc-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 sm:sticky sm:bottom-0 sm:z-30">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-xs">
         <div
           aria-live="polite"
@@ -60,10 +60,10 @@ export default function TemplateEditorFooter({
 
         <span className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
 
-        <div className="flex flex-wrap items-center gap-2 text-zinc-500 dark:text-zinc-400">
+        <div className="hidden flex-wrap items-center gap-2 text-zinc-500 dark:text-zinc-400 sm:flex">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             <EditorIcon name={mode === "wysiwyg" ? "layout-template" : "code-2"} className="size-3.5" />
-            {mode === "wysiwyg" ? "WYSIWYG" : "Code"}
+            {mode === "wysiwyg" ? "Visual" : "Code"}
           </span>
           <span>
             {mode === "wysiwyg"
@@ -86,7 +86,7 @@ export default function TemplateEditorFooter({
               <Shortcut keys="Delete" label="Remove" />
             </>
           ) : (
-            <span>Code mode keeps WYSIWYG blocks unchanged.</span>
+            <span>Code mode keeps Visual blocks unchanged.</span>
           )}
         </div>
       </div>

@@ -210,15 +210,19 @@ export default function BlockInspector({
                 <button
                   type="button"
                   disabled={uploading}
+                  aria-busy={uploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="shrink-0 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="min-h-11 shrink-0 rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   {uploading ? "Uploading…" : "Upload"}
                 </button>
               </div>
               {uploadError && (
-                <p className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
+                <p role="alert" className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
               )}
+              <span className="sr-only" aria-live="polite">
+                {uploading ? "Uploading image" : block.src ? "Image source ready" : ""}
+              </span>
               <ImageSourceNotice source={block.src ?? ""} />
               <input
                 ref={fileInputRef}

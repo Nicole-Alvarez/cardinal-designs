@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EditorIcon } from "./editor-controls";
 import type { CanvasSummary } from "@/features/templates/types";
+import AccessibleDialog from "@/components/ui/accessible-dialog";
 
 export default function CanvasSelector({
   canvases,
@@ -150,17 +151,20 @@ export default function CanvasSelector({
 
       {renamingId &&
         createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[10dvh] backdrop-blur-sm"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setRenamingId(null);
-            }}
+          <AccessibleDialog
+            open
+            onClose={() => setRenamingId(null)}
+            labelledBy="rename-canvas-title"
+            initialFocusRef={renameInputRef}
+            overlayClassName="items-start justify-center p-4 pt-[10dvh]"
+            panelClassName="w-80 rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-900"
           >
-            <div className="w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <div>
+              <label id="rename-canvas-title" htmlFor="rename-canvas-input" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Rename canvas
               </label>
               <input
+                id="rename-canvas-input"
                 ref={renameInputRef}
                 type="text"
                 value={renameValue}
@@ -169,26 +173,26 @@ export default function CanvasSelector({
                   if (e.key === "Enter") commitRename();
                   if (e.key === "Escape") setRenamingId(null);
                 }}
-                className="mt-2 block w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-100"
+                className="mt-2 block min-h-11 w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-base text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:border-zinc-700 dark:text-zinc-100"
               />
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setRenamingId(null)}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={commitRename}
-                  className="rounded-lg bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
+                  className="min-h-11 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
                 >
                   Rename
                 </button>
               </div>
             </div>
-          </div>,
+          </AccessibleDialog>,
           document.body
         )}
     </div>

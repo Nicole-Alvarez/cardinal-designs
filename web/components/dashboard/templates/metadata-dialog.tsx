@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   metadataFieldCount,
   mergeDetectedMetadata,
@@ -8,6 +8,8 @@ import {
   parseMetadataJson,
 } from "@/features/templates/metadata";
 import type { TemplateMetadata } from "@/features/templates/types";
+import AccessibleDialog from "@/components/ui/accessible-dialog";
+import { EditorIcon } from "./editor-controls";
 
 interface MetadataDialogProps {
   open: boolean;
@@ -54,14 +56,7 @@ function MetadataDialogContent({
   const [error, setError] = useState<string | null>(null);
   const [checkResult, setCheckResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function parse(): TemplateMetadata | null {
     try {
@@ -117,39 +112,34 @@ function MetadataDialogContent({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4"
-      role="presentation"
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <AccessibleDialog
+      open
+      onClose={onClose}
+      labelledBy="metadata-dialog-title"
+      describedBy="metadata-dialog-description"
+      initialFocusRef={textareaRef}
+      panelClassName="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
     >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="metadata-dialog-title"
-        data-template-selection-preserving
-        className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-      >
+      <div data-template-selection-preserving>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="metadata-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Preview metadata
+              Preview data
             </h2>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p id="metadata-dialog-description" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               Each JSON object or CSV row renders one preview. Use values in blocks with {"{{field}}"}.
             </p>
             <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-              Preview metadata is temporary and is never saved with the template.
+              Preview data is temporary and is never saved with the template.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close metadata dialog"
-            className="rounded-md px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            aria-label="Close preview data dialog"
+            className="grid size-11 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
           >
-            ×
+            <EditorIcon name="x" />
           </button>
         </div>
 
@@ -195,6 +185,7 @@ function MetadataDialogContent({
           </div>
         </div>
         <textarea
+          ref={textareaRef}
           id="template-metadata-json"
           value={source}
           onChange={(event) => {
@@ -204,8 +195,7 @@ function MetadataDialogContent({
           }}
           rows={16}
           spellCheck={false}
-          autoFocus
-          className="mt-2 w-full rounded-xl border border-zinc-300 bg-white p-3 font-mono text-xs leading-relaxed text-zinc-800 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+          className="mt-2 w-full rounded-xl border border-zinc-300 bg-white p-3 font-mono text-sm leading-relaxed text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
         />
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
           Extra fields are ignored. When a field is missing, its placeholder remains in the preview.
@@ -233,7 +223,7 @@ function MetadataDialogContent({
             Apply to preview
           </button>
         </div>
-      </section>
-    </div>
+      </div>
+    </AccessibleDialog>
   );
 }

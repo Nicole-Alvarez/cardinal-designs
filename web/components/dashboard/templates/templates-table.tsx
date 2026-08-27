@@ -13,7 +13,7 @@ export default function TemplatesTable({
   return (
     <section
       aria-label="Templates"
-      className="rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      className="rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div className="hidden grid-cols-[minmax(0,1fr)_8rem_12rem_12rem_5.5rem] items-center gap-4 border-b border-zinc-200 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500 md:grid">
         <span>Template</span>
@@ -64,7 +64,7 @@ export default function TemplatesTable({
                     name={template.isPrivate ? "lock" : "globe"}
                     className="size-3"
                   />
-                  {template.isPrivate ? "Private" : "Public"}
+                  {template.isPrivate ? "Private" : "Anyone with link"}
                 </span>
               </div>
 
@@ -84,7 +84,7 @@ export default function TemplatesTable({
                   <a
                     href={`/dashboard/templates/${template.id}`}
                     aria-label={`Open ${template.title}`}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50"
+                    className="inline-flex size-11 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 sm:size-9"
                   >
                     <EditorIcon name="arrow-up-right" className="size-4" />
                   </a>
@@ -98,7 +98,7 @@ export default function TemplatesTable({
                     onClick={() => onDelete(template.id)}
                     disabled={deleting}
                     aria-label={deleting ? `Deleting ${template.title}` : `Delete ${template.title}`}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/60 dark:hover:text-red-400"
+                    className="inline-flex size-11 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/60 dark:hover:text-red-400 sm:size-9"
                   >
                     <EditorIcon
                       name={deleting ? "loader-circle" : "trash-2"}

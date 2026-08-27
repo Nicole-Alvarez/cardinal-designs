@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AppSidebar from "./app-sidebar";
 import type { Role } from "@/lib/roles";
+import AccessibleDialog from "@/components/ui/accessible-dialog";
 
 interface AppShellProps {
   user: { username: string; name: string | null; role: Role };
@@ -24,7 +25,7 @@ export default function AppShell({ user, children }: AppShellProps) {
             type="button"
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
-            className="rounded-lg p-2 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className="grid size-11 place-items-center rounded-lg text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg
               width="20"
@@ -41,22 +42,25 @@ export default function AppShell({ user, children }: AppShellProps) {
           <span className="text-sm font-semibold tracking-tight">cardinal-designs</span>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
 
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setMenuOpen(false)}
-            className="absolute inset-0 bg-black/40"
+      <AccessibleDialog
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        labelledBy="mobile-navigation-title"
+        overlayClassName="items-stretch justify-start p-0 md:hidden"
+        panelClassName="h-full w-72 max-w-[88vw] bg-white shadow-2xl dark:bg-zinc-900"
+      >
+        <aside className="h-full">
+          <AppSidebar
+            user={user}
+            onNavigate={() => setMenuOpen(false)}
+            onClose={() => setMenuOpen(false)}
+            titleId="mobile-navigation-title"
           />
-          <aside className="absolute inset-y-0 left-0 w-64 border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-            <AppSidebar user={user} onNavigate={() => setMenuOpen(false)} />
-          </aside>
-        </div>
-      )}
+        </aside>
+      </AccessibleDialog>
     </div>
   );
 }

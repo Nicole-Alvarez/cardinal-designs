@@ -58,11 +58,13 @@ export function ColorInput({
       <div className="flex items-center gap-2">
         <input
           type="color"
+          aria-label="Choose color"
           value={value === "transparent" ? "#ffffff" : value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-10 cursor-pointer rounded border border-zinc-300 bg-transparent p-0.5 dark:border-zinc-700"
+          className="h-11 w-11 cursor-pointer rounded border border-zinc-300 bg-transparent p-1 dark:border-zinc-700"
         />
         <input
+          aria-label="Color value"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-xs focus:border-zinc-500 focus:outline-none dark:border-zinc-700"
@@ -152,6 +154,7 @@ export function SizeSelect({
       </select>
       {isCustom && (
         <NumberInput
+          aria-label="Custom size in pixels"
           value={parseInt(value, 10) || 1}
           min={1}
           integer

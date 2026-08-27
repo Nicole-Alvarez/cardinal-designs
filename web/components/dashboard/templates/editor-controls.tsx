@@ -1,4 +1,4 @@
-import { getIconSvg } from "@/features/templates/icons";
+import { UI_ICON_MAP } from "@/features/templates/ui-icons-data.generated";
 
 export function EditorIcon({
   name,
@@ -7,7 +7,7 @@ export function EditorIcon({
   name: string;
   className?: string;
 }) {
-  const inner = getIconSvg(name);
+  const inner = UI_ICON_MAP[name];
   if (!inner) return null;
 
   return (

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { codeFileName, downloadTextFile } from "@/features/templates/downloads";
 import { EditorIcon, EditorTooltip } from "./editor-controls";
 import PreviewExportActions from "./preview-export-actions";
+import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
 
 type Tab = "preview" | "html" | "react" | "angular";
 
@@ -30,14 +31,23 @@ export default function CodeOutput({
   const previewRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("preview");
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const code =
     tab === "html" ? html : tab === "react" ? reactCode : angularCode;
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      setCopied(false);
+      setCopyError(
+        error instanceof Error ? error.message : "Could not copy the code."
+      );
+    }
   }
 
   function handleDownloadCode() {
@@ -46,7 +56,7 @@ export default function CodeOutput({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex flex-wrap items-start gap-3 border-b border-zinc-200 bg-white/95 p-3 dark:border-zinc-800 dark:bg-zinc-900/95">
         <div className="flex h-9 shrink-0 items-center gap-2 px-1 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
           <span className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
@@ -60,7 +70,7 @@ export default function CodeOutput({
           aria-label="Template output"
           className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80"
         >
-          {OUTPUT_TABS.map((outputTab) => (
+          {OUTPUT_TABS.map((outputTab, index) => (
             <button
               key={outputTab.id}
               type="button"
@@ -68,7 +78,16 @@ export default function CodeOutput({
               id={`output-tab-${outputTab.id}`}
               aria-controls={`output-panel-${outputTab.id}`}
               aria-selected={tab === outputTab.id}
+              tabIndex={tab === outputTab.id ? 0 : -1}
               onClick={() => setTab(outputTab.id)}
+              onKeyDown={(event) =>
+                handleTabKeyboardNavigation(
+                  event,
+                  index,
+                  OUTPUT_TABS.length,
+                  (nextIndex) => setTab(OUTPUT_TABS[nextIndex].id)
+                )
+              }
               className={
                 "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
                 (tab === outputTab.id
@@ -92,7 +111,7 @@ export default function CodeOutput({
                   type="button"
                   onClick={handleCopy}
                   aria-label={copied ? "Code copied" : `Copy ${tab} code`}
-                  className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
                 >
                   <EditorIcon name={copied ? "check" : "copy"} />
                 </button>
@@ -102,7 +121,7 @@ export default function CodeOutput({
                   type="button"
                   onClick={handleDownloadCode}
                   aria-label={`Download ${tab} file`}
-                  className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
                 >
                   <EditorIcon name="file-down" />
                 </button>
@@ -114,6 +133,16 @@ export default function CodeOutput({
           )}
         </div>
       </div>
+
+      {copyError ? (
+        <p
+          role="alert"
+          className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300"
+        >
+          <EditorIcon name="circle-alert" className="size-4 shrink-0" />
+          {copyError}
+        </p>
+      ) : null}
 
       {tab === "preview" ? (
         <div
@@ -144,7 +173,7 @@ export default function CodeOutput({
           aria-labelledby={`output-tab-${tab}`}
           className="bg-zinc-950 p-2"
         >
-          <pre className="max-h-[32rem] overflow-auto rounded-xl p-4 font-mono text-xs leading-relaxed text-zinc-300 selection:bg-blue-500/30">
+          <pre className="max-h-[32rem] overflow-auto rounded-xl p-4 font-mono text-xs leading-relaxed text-zinc-300 selection:bg-zinc-700">
             <code>{code}</code>
           </pre>
         </div>

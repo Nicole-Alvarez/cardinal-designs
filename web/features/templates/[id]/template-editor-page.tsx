@@ -18,6 +18,7 @@ import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
 import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
 import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
 import TemplateEditorFooter from "@/components/dashboard/templates/template-editor-footer";
+import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
 import { blocksToAngular, blocksToHtml, blocksToReact } from "../codegen";
 import { GOOGLE_FONTS_URL } from "../fonts";
 import {
@@ -75,6 +76,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   >({ html: "", react: "", angular: "" });
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,34 +159,38 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     );
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const template = await getTemplate(templateId);
-        if (cancelled) return;
-        setTitle(template.title);
-        setDescription(template.description);
-        setIsPrivate(template.isPrivate);
-        setMode(template.isCode ? "code" : "wysiwyg");
+  const loadTemplate = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    setError(null);
+    try {
+      const template = await getTemplate(templateId);
+      setTitle(template.title);
+      setDescription(template.description);
+      setIsPrivate(template.isPrivate);
+      setMode(template.isCode ? "code" : "wysiwyg");
 
-        const canvasList = await listCanvases(templateId);
-        if (cancelled) return;
-        setCanvases(canvasList);
+      const canvasList = await listCanvases(templateId);
+      setCanvases(canvasList);
 
-        if (canvasList.length > 0) {
-          const first = canvasList[0];
-          setActiveCanvasId(first.id);
-          await loadCanvasContent(templateId, first.id);
-        }
-      } catch (err) {
-        if (!cancelled) setError((err as Error).message);
-      } finally {
-        if (!cancelled) setLoading(false);
+      if (canvasList.length > 0) {
+        const first = canvasList[0];
+        setActiveCanvasId(first.id);
+        await loadCanvasContent(templateId, first.id);
       }
-    })();
-    return () => { cancelled = true; };
-  }, [templateId, loadCanvasContent]);
+    } catch (err) {
+      setLoadError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCanvasContent, templateId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadTemplate();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTemplate]);
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
@@ -499,7 +505,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       setMode("wysiwyg");
       markDirty();
     } catch (err) {
-      setError(`Could not convert to WYSIWYG: ${(err as Error).message}`);
+      setError(`Could not convert to Visual: ${(err as Error).message}`);
     }
   }
 
@@ -590,12 +596,55 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading...</p>;
+    return (
+      <div role="status" className="grid min-h-dvh place-items-center p-6 text-center">
+        <div>
+          <EditorIcon name="loader-circle" className="mx-auto size-6 animate-spin text-zinc-500" />
+          <p className="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Loading template…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="grid min-h-dvh place-items-center p-6">
+        <div
+          role="alert"
+          className="w-full max-w-md rounded-2xl bg-red-50 p-6 text-center dark:bg-red-950/40"
+        >
+          <EditorIcon name="cloud-off" className="mx-auto size-6 text-red-700 dark:text-red-300" />
+          <h1 className="mt-4 text-lg font-semibold text-red-950 dark:text-red-100">
+            Could not load template
+          </h1>
+          <p className="mt-1 text-sm leading-6 text-red-700 dark:text-red-300">
+            {loadError}
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/dashboard/templates"
+              className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 dark:text-red-200 dark:hover:bg-red-950"
+            >
+              Back to templates
+            </Link>
+            <button
+              type="button"
+              onClick={() => void loadTemplate()}
+              className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:bg-red-600 dark:hover:bg-red-500"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <>
-      <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-4 lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+      <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-3 px-2 sm:px-4 lg:h-dvh lg:min-h-0 lg:overflow-hidden lg:px-0">
         {GOOGLE_FONTS_URL && <link rel="stylesheet" href={GOOGLE_FONTS_URL} />}
         <header className="sticky top-0 z-40 shrink-0 overflow-visible rounded-2xl border border-zinc-200 bg-white/95 shadow-md backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
           <div
@@ -607,7 +656,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               <Link
                 href="/dashboard/templates"
                 aria-label="Back to templates"
-                className="grid size-9 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 sm:size-9"
               >
                 <EditorIcon name="arrow-left" />
               </Link>
@@ -658,14 +707,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                     onClick={() => setMode(m)}
                     aria-pressed={mode === m}
                     className={
-                      "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                      "flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:min-h-9 " +
                       (mode === m
                         ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-700 dark:text-white"
                         : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")
                     }
                   >
                     <EditorIcon name={visualMode ? "layout-template" : "code-2"} />
-                    {visualMode ? "WYSIWYG" : "Code"}
+                    {visualMode ? "Visual" : "Code"}
                   </button>
                 </EditorTooltip>
               );
@@ -677,7 +726,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           <EditorTooltip
             label={
               mode === "code"
-                ? "Select all is available in WYSIWYG mode"
+                ? "Select all is available in Visual mode"
                 : selectedIds.length === blocks.length && blocks.length > 0
                 ? "Clear block selection"
                 : "Select all blocks"
@@ -695,7 +744,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                   ? "Clear block selection"
                   : "Select all blocks"
               }
-              className="grid size-9 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className="grid size-11 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 sm:size-9"
             >
               <EditorIcon
                 name={
@@ -713,7 +762,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 type="button"
                 onClick={handleUndo}
                 disabled={mode === "code" ? !codeHistory.canUndo : !history.canUndo}
-                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="min-h-11 rounded-lg px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:min-h-9"
               >
                 Undo
               </button>
@@ -723,7 +772,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 type="button"
                 onClick={handleRedo}
                 disabled={mode === "code" ? !codeHistory.canRedo : !history.canRedo}
-                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="min-h-11 rounded-lg px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:min-h-9"
               >
                 Redo
               </button>
@@ -736,7 +785,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
+                className="flex min-h-11 items-center gap-2 rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900 sm:min-h-9"
               >
                 <EditorIcon
                   name={saving ? "loader-circle" : "save"}
@@ -751,7 +800,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
         <main className="space-y-6 px-0.5 py-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:scroll-smooth">
           {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
               {error}
             </p>
           )}
@@ -780,7 +829,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
             <aside
               data-template-selection-preserving
-              className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
+              className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
             >
               <div
                 role="tablist"
@@ -789,11 +838,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               >
                 {(
                   [
-                    { id: "commands", label: "Commands" },
+                    { id: "commands", label: "Add" },
                     { id: "canvas", label: "Canvas" },
                     { id: "block", label: "Block" },
                   ] as const
-                ).map((tab) => (
+                ).map((tab, index, tabs) => (
                   <button
                     key={tab.id}
                     type="button"
@@ -801,9 +850,15 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                     id={`editor-tab-${tab.id}`}
                     aria-controls={`editor-panel-${tab.id}`}
                     aria-selected={panelTab === tab.id}
+                    tabIndex={panelTab === tab.id ? 0 : -1}
                     onClick={() => setPanelTab(tab.id)}
+                    onKeyDown={(event) =>
+                      handleTabKeyboardNavigation(event, index, tabs.length, (nextIndex) =>
+                        setPanelTab(tabs[nextIndex].id)
+                      )
+                    }
                     className={
-                      "flex h-9 min-w-0 items-center justify-center rounded-xl px-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+                      "flex min-h-11 min-w-0 items-center justify-center rounded-xl px-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:min-h-9 " +
                       (panelTab === tab.id
                         ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
                         : "text-zinc-400 hover:bg-white/70 hover:text-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200")

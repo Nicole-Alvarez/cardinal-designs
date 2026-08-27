@@ -3,22 +3,44 @@
 import { useState, type RefObject } from "react";
 import { downloadUrl, previewImageFileName } from "@/features/templates/downloads";
 import { renderPreviewImage } from "@/features/templates/image-export";
+import type { RenderedPreviewImage } from "@/features/templates/image-export";
 import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 export default function PreviewExportActions({
   title,
   previewRef,
+  previewRenderer,
 }: {
   title: string;
-  previewRef: RefObject<HTMLElement | null>;
+  previewRef?: RefObject<HTMLElement | null>;
+  previewRenderer?: (
+    target: "batch" | "cards",
+    options: { pixelRatio: number; allowFontFallback: boolean }
+  ) => Promise<RenderedPreviewImage[]>;
 }) {
   const [exporting, setExporting] = useState<"print" | "png" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportWarning, setExportWarning] = useState<string | null>(null);
 
   function previewContainer(): HTMLElement {
-    if (!previewRef.current) throw new Error("Preview is not ready yet.");
+    if (!previewRef?.current) throw new Error("Preview is not ready yet.");
     return previewRef.current;
+  }
+
+  async function renderSandboxOrDom(
+    target: "batch" | "cards",
+    options: { pixelRatio: number; allowFontFallback: boolean }
+  ): Promise<RenderedPreviewImage[]> {
+    if (previewRenderer) return previewRenderer(target, options);
+    const container = previewContainer();
+    if (target === "batch") {
+      const batch = container.querySelector<HTMLElement>("[data-template-preview-batch]");
+      if (!batch) throw new Error("Preview is not ready yet.");
+      return [await renderPreviewImage(batch, container, options)];
+    }
+    const cards = [...container.querySelectorAll<HTMLElement>("[data-template-preview-card]")];
+    if (cards.length === 0) throw new Error("Preview is not ready yet.");
+    return Promise.all(cards.map((card) => renderPreviewImage(card, container, options)));
   }
 
   async function handleDownloadPng() {
@@ -26,10 +48,7 @@ export default function PreviewExportActions({
     setExportError(null);
     setExportWarning(null);
     try {
-      const container = previewContainer();
-      const batch = container.querySelector<HTMLElement>("[data-template-preview-batch]");
-      if (!batch) throw new Error("Preview is not ready yet.");
-      const rendered = await renderPreviewImage(batch, container, {
+      const [rendered] = await renderSandboxOrDom("batch", {
         pixelRatio: 1,
         allowFontFallback: true,
       });
@@ -60,18 +79,10 @@ export default function PreviewExportActions({
     };
 
     try {
-      const container = previewContainer();
-      const cards = [...container.querySelectorAll<HTMLElement>("[data-template-preview-card]")];
-      if (cards.length === 0) throw new Error("Preview is not ready yet.");
-      const renderedCards = [];
-      for (const card of cards) {
-        renderedCards.push(
-          await renderPreviewImage(card, container, {
-            pixelRatio: 2,
-            allowFontFallback: false,
-          })
-        );
-      }
+      const renderedCards = await renderSandboxOrDom("cards", {
+        pixelRatio: 2,
+        allowFontFallback: false,
+      });
       const rendered = renderedCards[0];
 
       iframe = document.createElement("iframe");
@@ -129,7 +140,7 @@ export default function PreviewExportActions({
             onClick={handlePrint}
             disabled={exporting !== null}
             aria-label={exporting === "print" ? "Preparing print" : "Print preview"}
-            className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+            className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
           >
             <EditorIcon
               name={exporting === "print" ? "loader-circle" : "printer"}
@@ -148,7 +159,7 @@ export default function PreviewExportActions({
             aria-label={
               exporting === "png" ? "Exporting preview as PNG" : "Download preview as PNG"
             }
-            className="grid size-8 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+            className="grid size-11 place-items-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
           >
             <EditorIcon
               name={exporting === "png" ? "loader-circle" : "image-down"}

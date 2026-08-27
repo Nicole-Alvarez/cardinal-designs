@@ -655,7 +655,7 @@ export default function EditorCanvas({
             aria-label="Toggle spacing overlay"
             aria-pressed={showSpacing}
             className={
-              "grid size-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+              "grid size-11 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:size-8 " +
               (showSpacing
                 ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-50 dark:text-zinc-950"
                 : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white")
@@ -672,7 +672,7 @@ export default function EditorCanvas({
             aria-label="Toggle grid"
             aria-pressed={showGrid}
             className={
-              "grid size-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 " +
+              "grid size-11 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:size-8 " +
               (showGrid
                 ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-50 dark:text-zinc-950"
                 : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white")
@@ -684,7 +684,7 @@ export default function EditorCanvas({
 
         {showGrid && (
           <EditorTooltip label="Grid size in pixels" align="left">
-            <label className="flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+            <label className="flex h-11 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 sm:h-8">
               <DraftNumberInput
                 value={gridSize}
                 onCommit={(size) => onGridSizeChange?.(size)}
@@ -705,7 +705,7 @@ export default function EditorCanvas({
           aria-label="Zoom out"
           disabled={scale <= MIN_ZOOM + 0.001}
           onClick={() => applyManualZoom(stepZoom(scale, -1))}
-          className="grid size-8 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="grid size-11 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:size-8"
         >
           −
         </button>
@@ -720,7 +720,7 @@ export default function EditorCanvas({
           aria-label="Zoom in"
           disabled={scale >= MAX_ZOOM - 0.001}
           onClick={() => applyManualZoom(stepZoom(scale, 1))}
-          className="grid size-8 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="grid size-11 place-items-center rounded-lg text-base font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-35 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:size-8"
         >
           +
         </button>
@@ -729,7 +729,7 @@ export default function EditorCanvas({
           aria-label="Fit canvas"
           aria-pressed={viewMode === "fit"}
           onClick={handleFitCanvas}
-          className="h-8 rounded-lg px-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="h-11 rounded-lg px-3 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:h-8 sm:px-2"
         >
           Fit
         </button>
