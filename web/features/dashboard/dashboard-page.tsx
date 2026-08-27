@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { createTemplate, listTemplates } from "../templates/queries";
 import type { TemplateSummary } from "../templates/types";
@@ -14,6 +14,7 @@ export default function DashboardPage({ name }: { name: string }) {
   const [recentError, setRecentError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
+  const creatingRef = useRef(false);
 
   const loadRecent = useCallback(async () => {
     setLoadingRecent(true);
@@ -36,6 +37,9 @@ export default function DashboardPage({ name }: { name: string }) {
   }, [loadRecent]);
 
   async function handleCreate() {
+    if (creatingRef.current) return;
+
+    creatingRef.current = true;
     setCreating(true);
     setCreationError(null);
 
@@ -44,6 +48,7 @@ export default function DashboardPage({ name }: { name: string }) {
       router.push(`/dashboard/templates/${template.id}`);
     } catch (error) {
       setCreationError((error as Error).message || "Could not create a template. Try again.");
+      creatingRef.current = false;
       setCreating(false);
     }
   }
