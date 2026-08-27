@@ -5,45 +5,63 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { authenticatedRedirectPath } from "@/lib/auth-redirect";
 
-type LoginStatus = "idle" | "signing-in" | "redirecting";
+type RegisterStatus = "idle" | "registering" | "redirecting";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <Suspense>
-      <LoginForm />
+      <RegisterForm />
     </Suspense>
   );
 }
 
-function LoginForm() {
+function RegisterForm() {
   const searchParams = useSearchParams();
   const next = authenticatedRedirectPath(searchParams.get("next"));
 
+  const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<LoginStatus>("idle");
+  const [status, setStatus] = useState<RegisterStatus>("idle");
   const loading = status !== "idle";
+
+  function validateForm(): string | null {
+    if (!username.trim()) return "Username is required";
+    if (username.includes(" ")) return "Username cannot contain spaces";
+    if (!password) return "Password is required";
+    if (password.length < 8) return "Password must be at least 8 characters";
+    if (password !== confirmPassword) return "Passwords do not match";
+    return null;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setStatus("signing-in");
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setStatus("registering");
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password, name: name.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error ?? "Login failed");
+        throw new Error(data?.error ?? "Registration failed");
       }
       setStatus("redirecting");
       window.setTimeout(() => window.location.replace(next), 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Registration failed");
       setStatus("idle");
     }
   }
@@ -51,12 +69,23 @@ function LoginForm() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Enter your credentials to continue.
+          Enter your details to get started.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            Name (optional)
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+            />
+          </label>
+
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             Username
             <input
@@ -76,7 +105,21 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
+              minLength={8}
+              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            Confirm password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+              minLength={8}
               className="min-h-11 rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
             />
           </label>
@@ -94,16 +137,16 @@ function LoginForm() {
           >
             {status === "redirecting"
               ? "Redirecting..."
-              : status === "signing-in"
-                ? "Signing in..."
-                : "Sign in"}
+              : status === "registering"
+                ? "Creating account..."
+                : "Create account"}
           </button>
         </form>
 
         <p className="mt-4 text-sm text-center text-zinc-500 dark:text-zinc-400">
-          Don't have an account?{" "}
-          <Link href="/register" className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
-            Register
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
+            Sign in
           </Link>
         </p>
       </div>
@@ -118,7 +161,7 @@ function LoginForm() {
             aria-hidden="true"
             className="size-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-800 dark:border-zinc-600 dark:border-t-zinc-100"
           />
-          {status === "redirecting" ? "Redirecting…" : "Signing in…"}
+          {status === "redirecting" ? "Redirecting…" : "Creating account…"}
         </div>
       )}
     </main>
