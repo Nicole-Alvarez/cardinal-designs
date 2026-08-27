@@ -30,10 +30,14 @@ describe("ConfirmDialog accessibility", () => {
 
     const opener = screen.getByRole("button", { name: "Open dialog" });
     await user.click(opener);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 
     await user.tab({ shift: true });
     expect(screen.getByRole("button", { name: "Confirm" })).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

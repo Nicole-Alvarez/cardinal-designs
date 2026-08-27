@@ -17,14 +17,17 @@ describe("CodeEditorPanel preview isolation", () => {
       <CodeEditorPanel
         {...baseProps}
         lang="html"
-        code={'<img src="https://example.com/untrusted.png" alt="untrusted" onerror="window.parent.document.body.remove()">'}
+        code={
+          '<section data-untrusted-preview><img src="https://example.com/untrusted.png" alt="untrusted" onerror="window.parent.document.body.remove()"></section>'
+        }
       />
     );
 
     const frame = screen.getByTitle("HTML template preview");
     expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    expect(frame).not.toHaveAttribute("sandbox", expect.stringContaining("allow-same-origin"));
-    expect(document.querySelector('img[alt="untrusted"]')).toBeNull();
+    expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(document.querySelector("[data-untrusted-preview]")).toBeNull();
     expect(screen.getByRole("button", { name: "Print preview" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download preview as PNG" })).toBeEnabled();
   });
