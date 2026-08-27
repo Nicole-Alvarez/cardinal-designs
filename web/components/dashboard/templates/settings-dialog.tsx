@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import AccessibleDialog from "@/components/ui/accessible-dialog";
 import { EditorIcon } from "./editor-controls";
 import { DraftTextInput } from "./draft-inputs";
 import ConfirmDialog from "./confirm-dialog";
@@ -16,12 +17,14 @@ function SettingsDialogContent({
   description: string;
   isPrivate: boolean;
   onClose: () => void;
-  onSave: (patch: { title: string; description: string; isPrivate: boolean }) => void;
+  onSave: (patch: { title: string; description: string; isPrivate: boolean }) => void | Promise<void>;
 }) {
   const [editTitle, setEditTitle] = useState(title);
   const [editDescription, setEditDescription] = useState(description);
   const [editIsPrivate, setEditIsPrivate] = useState(isPrivate);
   const [privacyConfirmOpen, setPrivacyConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   function handlePrivacyToggle(nextValue: boolean) {
     if (!nextValue && editIsPrivate) {
@@ -31,34 +34,48 @@ function SettingsDialogContent({
     setEditIsPrivate(nextValue);
   }
 
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave({
+        title: editTitle,
+        description: editDescription,
+        isPrivate: editIsPrivate,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
+      <AccessibleDialog
+        open
+        onClose={onClose}
+        labelledBy="settings-dialog-title"
+        describedBy="settings-dialog-description"
+        initialFocusRef={closeButtonRef}
+        closeOnBackdrop={!saving}
+        panelClassName="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
       >
-        <section
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="settings-dialog-title"
-          className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-        >
+        <div>
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="settings-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                 Template settings
               </h2>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p id="settings-dialog-description" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 Manage privacy, title, and description.
               </p>
             </div>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
+              disabled={saving}
               aria-label="Close settings"
-              className="rounded-md px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className="grid size-11 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
             >
               <EditorIcon name="x" className="size-4" />
             </button>
@@ -122,7 +139,7 @@ function SettingsDialogContent({
                   }`}
                 >
                   <EditorIcon name="globe" className="size-4" />
-                  Public
+                  Anyone with link
                 </button>
               </div>
               <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
@@ -137,26 +154,28 @@ function SettingsDialogContent({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              disabled={saving}
+              className="min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={() => onSave({ title: editTitle, description: editDescription, isPrivate: editIsPrivate })}
-              className="rounded-lg bg-zinc-950 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
+              onClick={handleSave}
+              disabled={saving}
+              className="min-h-11 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
             >
-              Save settings
+              {saving ? "Saving…" : "Save settings"}
             </button>
           </div>
-        </section>
-      </div>
+        </div>
+      </AccessibleDialog>
 
       <ConfirmDialog
         open={privacyConfirmOpen}
-        title="Make template public?"
-        description="This will make your template visible to anyone with the link. You can switch back to private at any time."
-        confirmLabel="Make public"
+        title="Allow access by link?"
+        description="Anyone with the link will be able to view this template. You can switch back to private at any time."
+        confirmLabel="Allow link access"
         onConfirm={() => {
           setEditIsPrivate(false);
           setPrivacyConfirmOpen(false);
@@ -180,7 +199,7 @@ export default function SettingsDialog({
   description: string;
   isPrivate: boolean;
   onClose: () => void;
-  onSave: (patch: { title: string; description: string; isPrivate: boolean }) => void;
+  onSave: (patch: { title: string; description: string; isPrivate: boolean }) => void | Promise<void>;
 }) {
   if (!open) return null;
 

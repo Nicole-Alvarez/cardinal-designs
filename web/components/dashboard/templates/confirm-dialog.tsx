@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import AccessibleDialog from "@/components/ui/accessible-dialog";
 import { EditorIcon } from "./editor-controls";
 
 export default function ConfirmDialog({
@@ -24,34 +25,16 @@ export default function ConfirmDialog({
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (open) cancelRef.current?.focus();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onCancel]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
+    <AccessibleDialog
+      open={open}
+      onClose={onCancel}
+      labelledBy="confirm-dialog-title"
+      describedBy="confirm-dialog-description"
+      initialFocusRef={cancelRef}
+      closeOnBackdrop={!loading}
+      panelClassName="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
     >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-      >
         <div className="flex items-start gap-3">
           <span
             className={`grid size-9 shrink-0 place-items-center rounded-lg ${
@@ -72,7 +55,7 @@ export default function ConfirmDialog({
             >
               {title}
             </h2>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p id="confirm-dialog-description" className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {description}
             </p>
           </div>
@@ -84,7 +67,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="min-h-11 rounded-lg px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             Cancel
           </button>
@@ -92,7 +75,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:focus-visible:ring-offset-zinc-900 ${
+            className={`min-h-11 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:opacity-60 dark:focus-visible:ring-offset-zinc-900 ${
               confirmVariant === "danger"
                 ? "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
                 : "bg-zinc-950 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
@@ -101,7 +84,6 @@ export default function ConfirmDialog({
             {loading ? "Processing..." : confirmLabel}
           </button>
         </div>
-      </section>
-    </div>
+    </AccessibleDialog>
   );
 }

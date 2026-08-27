@@ -83,7 +83,7 @@ export default function EditorCommands({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-            Metadata
+            Preview data
             {metadataCount > 0 && (
               <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-blue-600 dark:bg-blue-950 dark:text-blue-300">
                 {metadataCount}

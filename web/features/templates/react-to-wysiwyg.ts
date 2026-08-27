@@ -466,7 +466,7 @@ function htmlBlockFromFrame(frame: Element, index: number): TemplateBlock {
 export function htmlCodeToWysiwyg(source: string): CodeWysiwygConversion {
   if (!source.trim()) throw new Error("Paste HTML code before converting.");
   const document_ = new DOMParser().parseFromString(source, "text/html");
-  if (document_.querySelector("script")) throw new Error("Scripts cannot be converted to WYSIWYG blocks.");
+  if (document_.querySelector("script")) throw new Error("Scripts cannot be converted to Visual blocks.");
 
   const roots = Array.from(document_.body.children).filter((element) => element.localName !== "link");
   if (roots.length !== 1) throw new Error("HTML must contain one canvas root element.");

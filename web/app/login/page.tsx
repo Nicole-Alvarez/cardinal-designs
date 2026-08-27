@@ -64,7 +64,7 @@ function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
+              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
             />
           </label>
 
@@ -76,12 +76,12 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
+              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
             />
           </label>
 
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
               {error}
             </p>
           )}
@@ -89,7 +89,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="mt-2 min-h-11 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             {status === "redirecting"
               ? "Redirecting..."

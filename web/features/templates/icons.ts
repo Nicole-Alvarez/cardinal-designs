@@ -1,4 +1,4 @@
-import { GENERATED_ICONS, GENERATED_ICON_MAP } from "./icons-data.generated";
+import { GENERATED_ICONS } from "./icons-data.generated";
 
 export interface IconEntry {
   name: string;
@@ -6,6 +6,7 @@ export interface IconEntry {
 }
 
 export const ICONS: IconEntry[] = GENERATED_ICONS;
+const ICON_MAP = new Map(ICONS.map((icon) => [icon.name, icon.svg]));
 
 /** Lucide icon assigned to new icon blocks. */
 export const DEFAULT_ICON_NAME = "star";
@@ -19,7 +20,7 @@ const svgAttrsJsx =
 /** Inner SVG markup for an icon name, or null if unknown. */
 export function getIconSvg(name: string | undefined): string | null {
   if (!name) return null;
-  return GENERATED_ICON_MAP[name] ?? null;
+  return ICON_MAP.get(name) ?? null;
 }
 
 /**

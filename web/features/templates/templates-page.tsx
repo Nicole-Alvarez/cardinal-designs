@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditorIcon } from "@/components/dashboard/templates/editor-controls";
 import TemplatesTable from "@/components/dashboard/templates/templates-table";
 import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
@@ -15,17 +15,32 @@ import type { TemplateSummary } from "./types";
 export default function TemplatesPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
-  useEffect(() => {
-    listTemplates()
-      .then(setTemplates)
-      .catch((err: Error) => setError(err.message));
+  const loadTemplateList = useCallback(async () => {
+    setLoadingTemplates(true);
+    setError(null);
+    try {
+      setTemplates(await listTemplates());
+    } catch (err) {
+      setTemplates(null);
+      setError((err as Error).message);
+    } finally {
+      setLoadingTemplates(false);
+    }
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadTemplateList();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTemplateList]);
 
   async function handleCreate() {
     setCreating(true);
@@ -61,9 +76,11 @@ export default function TemplatesPage() {
     }
   }
 
+  const initialLoadFailed = !loadingTemplates && templates === null && error !== null;
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <header className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-5 py-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:px-7 sm:py-7">
+      <header className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-5 py-6 dark:border-zinc-800 dark:bg-zinc-900 sm:px-7 sm:py-7">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-gradient-to-br from-violet-200/60 via-sky-100/30 to-transparent blur-2xl dark:from-violet-900/30 dark:via-sky-900/10"
@@ -106,7 +123,7 @@ export default function TemplatesPage() {
         </div>
       </header>
 
-      {error && (
+      {error && !initialLoadFailed && (
         <div
           role="alert"
           className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3.5 text-sm text-red-700 shadow-sm dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-300"
@@ -119,7 +136,7 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {templates === null ? (
+      {loadingTemplates ? (
         <div
           role="status"
           className="flex min-h-56 flex-col items-center justify-center rounded-3xl border border-zinc-200 bg-white px-6 py-12 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
@@ -133,6 +150,28 @@ export default function TemplatesPage() {
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Preparing your design workspace...
           </p>
+        </div>
+      ) : templates === null ? (
+        <div
+          role="alert"
+          className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50/70 px-6 py-12 text-center dark:border-red-900/70 dark:bg-red-950/30"
+        >
+          <span className="grid size-11 place-items-center rounded-xl bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+            <EditorIcon name="cloud-off" className="size-5" />
+          </span>
+          <h2 className="mt-4 text-base font-semibold text-red-950 dark:text-red-100">
+            Could not load templates
+          </h2>
+          <p className="mt-1 max-w-md text-sm leading-6 text-red-700 dark:text-red-300">
+            {error ?? "Check your connection and try again."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadTemplateList()}
+            className="mt-5 min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:bg-red-600 dark:hover:bg-red-500"
+          >
+            Try again
+          </button>
         </div>
       ) : templates.length === 0 ? (
         <div className="flex min-h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-zinc-300 bg-gradient-to-b from-white to-zinc-50/70 px-6 py-12 text-center dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-950/40">
