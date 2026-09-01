@@ -28,6 +28,7 @@ const uiIconNames = new Set([
   "eye",
   "file-code",
   "file-down",
+  "folder-archive",
   "file-json",
   "globe",
   "grid-3x3",

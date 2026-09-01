@@ -28,6 +28,8 @@ interface EditorToolbarProps {
   onRedo: () => void;
   onSelectAll: () => void;
   onPreviewData: () => void;
+  onAiCreate: () => void;
+  onZipExport?: () => void;
   onPreview: () => void;
   onSettings: () => void;
   onSave: () => void;
@@ -53,6 +55,8 @@ export default function EditorToolbar({
   onRedo,
   onSelectAll,
   onPreviewData,
+  onAiCreate,
+  onZipExport,
   onPreview,
   onSettings,
   onSave,
@@ -153,6 +157,16 @@ export default function EditorToolbar({
               <EditorIcon name="eye" />
             </Button>
           </EditorTooltip>
+          <EditorTooltip label="Create with AI" align="right">
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Create with AI" onClick={onAiCreate}>
+              <EditorIcon name="sparkles" />
+            </Button>
+          </EditorTooltip>
+          {onZipExport ? <EditorTooltip label="Download template ZIP" align="right">
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Download template ZIP" onClick={onZipExport}>
+              <EditorIcon name="folder-archive" />
+            </Button>
+          </EditorTooltip> : null}
           <EditorTooltip label="Preview data" align="right">
             <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Preview data" onClick={onPreviewData}>
               <EditorIcon name="file-json" />

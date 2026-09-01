@@ -14,4 +14,5 @@ export const config = {
   cookieName: "cardinal_session",
   blobToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
   publicBlobToken: process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ?? "",
+  openAiApiKey: process.env.OPENAI_API_KEY ?? "",
 };

@@ -21,6 +21,7 @@ const baseProps = {
   onRedo: vi.fn(),
   onSelectAll: vi.fn(),
   onPreviewData: vi.fn(),
+  onAiCreate: vi.fn(),
   onPreview: vi.fn(),
   onSettings: vi.fn(),
   onSave: vi.fn(),
@@ -43,11 +44,13 @@ describe("EditorToolbar", () => {
   });
 
   it("exposes document actions and one clear save status", () => {
-    render(<EditorToolbar {...baseProps} />);
+    render(<EditorToolbar {...baseProps} onZipExport={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Save template" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Preview" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Preview data" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Create with AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Download template ZIP" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Template settings" })).toBeEnabled();
     expect(screen.getByRole("status")).toHaveTextContent("Unsaved changes");
   });
@@ -63,6 +66,7 @@ describe("EditorToolbar", () => {
       "Select all blocks",
       "Preview",
       "Preview data",
+      "Create with AI",
       "More template actions",
       "Template settings",
     ]) {

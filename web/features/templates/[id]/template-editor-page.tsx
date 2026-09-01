@@ -18,6 +18,8 @@ import MobileEditorActions, {
   type MobileEditorAction,
 } from "@/components/dashboard/templates/mobile-editor-actions";
 import PreviewDialog from "@/components/dashboard/templates/preview-dialog";
+import AiCreateDialog from "@/components/dashboard/templates/ai-create-dialog";
+import TemplateZipExportDialog from "@/components/dashboard/templates/template-zip-export-dialog";
 import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
 import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
 import WorkspaceSheet from "@/components/dashboard/templates/workspace-sheet";
@@ -75,6 +77,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [metadataOpen, setMetadataOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [aiCreateOpen, setAiCreateOpen] = useState(false);
+  const [zipExportOpen, setZipExportOpen] = useState(false);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
@@ -554,6 +558,15 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setPreviewMetadata(nextMetadata);
   }
 
+  function applyAiLayout(content: { canvas: TemplateCanvas; blocks: TemplateBlock[] }) {
+    checkpoint("ai-create");
+    setCanvas(content.canvas);
+    setBlocks(content.blocks);
+    setSelectedIds([]);
+    setPanelTab("canvas");
+    markDirty();
+  }
+
   async function handleConvertToWysiwyg() {
     setError(null);
     try {
@@ -736,6 +749,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           onRedo={handleRedo}
           onSelectAll={handleSelectAll}
           onPreviewData={() => setMetadataOpen(true)}
+          onAiCreate={() => setAiCreateOpen(true)}
+          onZipExport={() => setZipExportOpen(true)}
           onPreview={() => setPreviewOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onSave={handleSave}
@@ -912,6 +927,23 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         isPrivate={isPrivate}
         onClose={() => setSettingsOpen(false)}
         onSave={handleSettingsSave}
+      />
+
+      <AiCreateDialog
+        open={aiCreateOpen}
+        canvas={canvas}
+        onClose={() => setAiCreateOpen(false)}
+        onApply={applyAiLayout}
+      />
+
+      <TemplateZipExportDialog
+        open={zipExportOpen}
+        onClose={() => setZipExportOpen(false)}
+        templateId={templateId}
+        title={title}
+        canvases={canvases}
+        activeCanvasId={activeCanvasId}
+        activeContent={{ version: 4, canvas, blocks, metadata: previewMetadata }}
       />
 
       <PreviewDialog
