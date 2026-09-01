@@ -7,7 +7,7 @@ export class TemplateError extends Error {
   }
 }
 
-const publicColumns = {
+const baseColumns = {
   id: true,
   title: true,
   description: true,
@@ -15,18 +15,19 @@ const publicColumns = {
   isCode: true,
   createdAt: true,
   updatedAt: true,
-  canvases: {
-    select: {
-      id: true,
-      title: true,
-      position: true,
-    },
-    take: 1,
-    orderBy: { position: "asc" },
-  },
-};
+} as const;
 
-type Template = Prisma.TemplateGetPayload<{ select: typeof publicColumns }>;
+const withCanvasesColumns = {
+  ...baseColumns,
+  canvases: {
+    select: { id: true, title: true, position: true },
+    take: 1,
+    orderBy: { position: "asc" as const },
+  },
+} as const;
+
+type Template = Prisma.TemplateGetPayload<{ select: typeof baseColumns }>;
+type TemplateWithCanvas = Prisma.TemplateGetPayload<{ select: typeof withCanvasesColumns }>;
 
 function randomSuffix() {
   return Math.random().toString(36).slice(2, 8);
@@ -63,10 +64,10 @@ export async function list(userId: string): Promise<TemplateSummary[]> {
   });
 }
 
-export async function getById(id: string, userId: string): Promise<Template> {
+export async function getById(id: string, userId: string): Promise<TemplateWithCanvas> {
   const template = await prisma.template.findFirst({
     where: { id, userId },
-    select: publicColumns,
+    select: withCanvasesColumns,
   });
   if (!template) {
     throw new TemplateError("Template not found", 404);
@@ -98,7 +99,7 @@ export async function create(
             },
           },
         },
-        select: publicColumns,
+        select: baseColumns,
       });
     } catch (err) {
       const isUniqueViolation =
@@ -163,7 +164,7 @@ export async function update(
     return await prisma.template.update({
       where: { id, userId },
       data,
-      select: publicColumns,
+      select: baseColumns,
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
