@@ -11,6 +11,7 @@ export interface TemplateSummary {
 
 export interface Template extends TemplateSummary {
   isCode: boolean;
+  canvases?: Array<{ id: string; title: string; position: number }>;
 }
 
 export interface CanvasSummary {

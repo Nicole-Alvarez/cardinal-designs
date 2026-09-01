@@ -13,10 +13,17 @@ export async function getTemplate(id: string): Promise<Template> {
   return data.template;
 }
 
-export async function createTemplate(): Promise<Template> {
+export async function createTemplate(input?: {
+  title?: string;
+  description?: string;
+  isPrivate?: boolean;
+  isCode?: boolean;
+}): Promise<Template> {
   const data = await apiFetch("/api/templates", {
     method: "POST",
     credentials: "include",
+    body: JSON.stringify(input ?? {}),
+    headers: { "Content-Type": "application/json" },
   });
   return data.template;
 }

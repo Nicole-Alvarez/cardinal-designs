@@ -1,113 +1,87 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import CodeEditorPanel from "./code-editor-panel";
 
 const baseProps = {
-  title: "Member card",
-  onLangChange: vi.fn(),
+  lang: "html" as const,
+  code: "<div>Generated card</div>",
   onCodeChange: vi.fn(),
   metadata: [],
   onOpenMetadata: vi.fn(),
   onConvertToWysiwyg: vi.fn(),
+  onImportCode: vi.fn(),
 };
 
-afterEach(() => vi.useRealTimers());
+describe("CodeEditorPanel", () => {
+  it("renders the active code buffer with a readable language label", () => {
+    render(<CodeEditorPanel {...baseProps} />);
 
-describe("CodeEditorPanel preview isolation", () => {
-  it("renders pasted HTML inside an opaque-origin sandbox", () => {
-    render(
-      <CodeEditorPanel
-        {...baseProps}
-        lang="html"
-        code={
-          '<section data-untrusted-preview><img src="https://example.com/untrusted.png" alt="untrusted" onerror="window.parent.document.body.remove()"></section>'
-        }
-      />
-    );
-
-    const frame = screen.getByTitle("HTML template preview");
-    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
-    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
-    expect(frame).toHaveAttribute("srcdoc");
-    expect(frame).not.toHaveAttribute("src");
-    expect(document.querySelector("[data-untrusted-preview]")).toBeNull();
-    expect(screen.getByRole("button", { name: "Print preview" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Download preview as PNG" })).toBeEnabled();
+    const textarea = screen.getByLabelText("HTML template code");
+    expect(textarea).toHaveValue("<div>Generated card</div>");
+    expect(screen.getAllByText("HTML").length).toBeGreaterThan(0);
   });
 
-  it("removes the HTML preparation state when the isolated document loads", () => {
-    render(
-      <CodeEditorPanel
-        {...baseProps}
-        lang="html"
-        code="<div>Generated card</div>"
-      />
-    );
-
-    const frame = screen.getByTitle("HTML template preview");
-    expect(screen.getByText("Preparing isolated preview…")).toBeInTheDocument();
-
-    fireEvent.load(frame);
-
-    expect(screen.queryByText("Preparing isolated preview…")).not.toBeInTheDocument();
-  });
-
-  it("offers a retry instead of leaving a failed preview loading forever", () => {
-    vi.useFakeTimers();
-    render(
-      <CodeEditorPanel
-        {...baseProps}
-        lang="html"
-        code="<div>Generated card</div>"
-      />
-    );
-
-    act(() => vi.advanceTimersByTime(8_000));
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "The isolated preview did not start. Try reloading it."
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Retry preview" }));
-    expect(screen.getByText("Preparing isolated preview…")).toBeInTheDocument();
-  });
-
-  it("renders React code inside the same self-contained opaque-origin sandbox", async () => {
-    render(
-      <CodeEditorPanel
-        {...baseProps}
-        lang="react"
-        code={'export default function Template() { return <div>Untrusted React</div>; }'}
-      />
-    );
-
-    const frame = screen.getByTitle("React template preview");
-    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    await waitFor(() => expect(frame).toHaveAttribute("srcdoc"));
-    expect(frame).not.toHaveAttribute("src");
-    expect(screen.queryByText("Untrusted React")).not.toBeInTheDocument();
-  });
-
-  it("shows Angular as unavailable and skips it during keyboard navigation", async () => {
+  it("edits the code buffer through onCodeChange", async () => {
     const user = userEvent.setup();
-    const onLangChange = vi.fn();
+    const onCodeChange = vi.fn();
+    render(<CodeEditorPanel {...baseProps} onCodeChange={onCodeChange} />);
+
+    await user.type(screen.getByLabelText("HTML template code"), "x");
+    expect(onCodeChange).toHaveBeenCalled();
+  });
+
+  it("opens the conversion disclaimer and confirms onConvertToWysiwyg", async () => {
+    const user = userEvent.setup();
+    const onConvertToWysiwyg = vi.fn();
     render(
-      <CodeEditorPanel
-        {...baseProps}
-        onLangChange={onLangChange}
-        lang="react"
-        code="export default function Template() { return null; }"
-      />
+      <CodeEditorPanel {...baseProps} lang="react" onConvertToWysiwyg={onConvertToWysiwyg} />
     );
 
-    const angular = screen.getByRole("tab", { name: /Angular.*Coming soon/i });
-    expect(angular).toBeDisabled();
-    expect(angular).toHaveAttribute("aria-disabled", "true");
-    expect(angular).toHaveAttribute("tabindex", "-1");
+    await user.click(screen.getByRole("button", { name: "Convert to Visual" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue conversion" }));
+    expect(onConvertToWysiwyg).toHaveBeenCalledTimes(1);
+  });
 
-    screen.getByRole("tab", { name: "React" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(onLangChange).toHaveBeenLastCalledWith("html");
+  it("opens the import dialog from the lang chip to change the code type", async () => {
+    const user = userEvent.setup();
+    render(<CodeEditorPanel {...baseProps} lang="react" code="export default function Card() {}" />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Change code type (currently React)" })
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "React" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+  });
+
+  it("opens the import dialog and forwards a pasted source through onImportCode", async () => {
+    const user = userEvent.setup();
+    const onImportCode = vi.fn();
+    render(<CodeEditorPanel {...baseProps} onImportCode={onImportCode} />);
+
+    await user.click(screen.getByRole("button", { name: "Import code" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.type(
+      screen.getByLabelText("HTML code to import"),
+      "<div>Imported</div>"
+    );
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    await user.click(screen.getByRole("button", { name: "Continue import" }));
+
+    expect(onImportCode).toHaveBeenCalledWith("html", "<div>Imported</div>");
+  });
+
+  it("opens the metadata dialog through onOpenMetadata", async () => {
+    const user = userEvent.setup();
+    const onOpenMetadata = vi.fn();
+    render(<CodeEditorPanel {...baseProps} onOpenMetadata={onOpenMetadata} />);
+
+    await user.click(screen.getByRole("button", { name: "Preview data, 0 records" }));
+    expect(onOpenMetadata).toHaveBeenCalledTimes(1);
   });
 });

@@ -29,10 +29,12 @@ export function EditorTooltip({
   label,
   children,
   align = "center",
+  placement = "bottom",
 }: {
   label: string;
   children: React.ReactNode;
   align?: "left" | "center" | "right";
+  placement?: "top" | "bottom";
 }) {
   const position =
     align === "left"
@@ -40,13 +42,15 @@ export function EditorTooltip({
       : align === "right"
         ? "right-0"
         : "left-1/2 -translate-x-1/2";
+  const place =
+    placement === "top" ? "bottom-full mb-2" : "top-full mt-2";
 
   return (
     <span className="group/tooltip relative inline-flex">
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none invisible absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/tooltip:visible group-hover/tooltip:opacity-100 group-has-[:focus-visible]/tooltip:visible group-has-[:focus-visible]/tooltip:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${position}`}
+        className={`pointer-events-none invisible absolute z-50 whitespace-nowrap rounded-md bg-zinc-950 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/tooltip:visible group-hover/tooltip:opacity-100 group-has-[:focus-visible]/tooltip:visible group-has-[:focus-visible]/tooltip:opacity-100 dark:bg-zinc-50 dark:text-zinc-950 ${place} ${position}`}
       >
         {label}
       </span>

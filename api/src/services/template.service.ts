@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
-import prisma from "../prisma";export class TemplateError extends Error {
+import prisma from "../prisma";
+
+export class TemplateError extends Error {
   constructor(message: string, public statusCode = 400) {
     super(message);
   }
@@ -13,6 +15,15 @@ const publicColumns = {
   isCode: true,
   createdAt: true,
   updatedAt: true,
+  canvases: {
+    select: {
+      id: true,
+      title: true,
+      position: true,
+    },
+    take: 1,
+    orderBy: { position: "asc" },
+  },
 };
 
 type Template = Prisma.TemplateGetPayload<{ select: typeof publicColumns }>;
@@ -28,6 +39,13 @@ export interface TemplateSummary {
   isPrivate: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CreateTemplateInput {
+  title?: string;
+  description?: string;
+  isPrivate?: boolean;
+  isCode?: boolean;
 }
 
 export async function list(userId: string): Promise<TemplateSummary[]> {
@@ -56,15 +74,23 @@ export async function getById(id: string, userId: string): Promise<Template> {
   return template;
 }
 
-export async function create(userId: string): Promise<Template> {
+export async function create(
+  userId: string,
+  input?: CreateTemplateInput
+): Promise<Template> {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const title = `Untitled-${randomSuffix()}`;
+      const title = input?.title?.trim() || `Untitled-${randomSuffix()}`;
+      const description = input?.description?.trim() || "";
+      const isPrivate = input?.isPrivate ?? true;
+      const isCode = input?.isCode ?? false;
       return await prisma.template.create({
         data: {
           userId,
           title,
-          description: "",
+          description,
+          isPrivate,
+          isCode,
           canvases: {
             create: {
               title,

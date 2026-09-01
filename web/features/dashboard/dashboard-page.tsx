@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { createTemplate, listTemplates } from "../templates/queries";
+import { listTemplates } from "../templates/queries";
 import type { TemplateSummary } from "../templates/types";
 
 export default function DashboardPage({ name }: { name: string }) {
@@ -44,8 +44,7 @@ export default function DashboardPage({ name }: { name: string }) {
     setCreationError(null);
 
     try {
-      const template = await createTemplate();
-      router.push(`/dashboard/templates/${template.id}`);
+      router.push("/dashboard/templates/new");
     } catch (error) {
       setCreationError((error as Error).message || "Could not create a template. Try again.");
       creatingRef.current = false;

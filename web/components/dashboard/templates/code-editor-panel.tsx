@@ -2,46 +2,36 @@
 
 import { useRef, useState } from "react";
 import type { CodeLang, TemplateMetadata } from "@/features/templates/types";
-import { EditorIcon, EditorTooltip } from "./editor-controls";
-import PreviewExportActions from "./preview-export-actions";
-import SandboxedCodePreview, {
-  type SandboxedCodePreviewHandle,
-} from "./sandboxed-code-preview";
 import AccessibleDialog from "@/components/ui/accessible-dialog";
-import { handleTabKeyboardNavigation } from "@/components/ui/tab-keyboard";
+import { EditorIcon, EditorTooltip } from "./editor-controls";
+import CodeImportDialog from "./code-import-dialog";
 
-const LANGS: {
-  value: Exclude<CodeLang, "angular">;
-  label: string;
-  icon: string;
-}[] = [
-  { value: "html", label: "HTML", icon: "code-xml" },
-  { value: "react", label: "React", icon: "atom" },
-];
+const LANG_LABEL: Record<Exclude<CodeLang, "angular">, { label: string; icon: string }> = {
+  html: { label: "HTML", icon: "code-xml" },
+  react: { label: "React", icon: "atom" },
+};
 
 export default function CodeEditorPanel({
-  title,
   lang,
-  onLangChange,
   code,
   onCodeChange,
   metadata,
   onOpenMetadata,
   onConvertToWysiwyg,
+  onImportCode,
 }: {
-  title: string;
   lang: CodeLang;
-  onLangChange: (lang: CodeLang) => void;
   code: string;
   onCodeChange: (value: string) => void;
   metadata: TemplateMetadata;
   onOpenMetadata: () => void;
   onConvertToWysiwyg: () => void;
+  onImportCode: (lang: "html" | "react", source: string) => void;
 }) {
   const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const conversionButtonRef = useRef<HTMLButtonElement>(null);
-  const sandboxPreviewRef = useRef<SandboxedCodePreviewHandle>(null);
-  const activeLanguage = LANGS.find((language) => language.value === lang) ?? LANGS[0];
+  const activeLanguage = LANG_LABEL[lang === "angular" ? "html" : lang];
   const lineCount = code ? code.split("\n").length : 0;
 
   function closeConversionDialog() {
@@ -62,59 +52,33 @@ export default function CodeEditorPanel({
                 Code workspace
               </h2>
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                Preview updates as you type
+                Preview updates in the toolbar preview
               </p>
             </div>
           </div>
 
-          <div
-            role="tablist"
-            aria-label="Code language"
-            className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80"
+          <button
+            type="button"
+            onClick={() => setImportDialogOpen(true)}
+            data-template-selection-preserving
+            aria-label={`Change code type (currently ${activeLanguage.label})`}
+            className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-zinc-100 px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:bg-zinc-800/80 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            {LANGS.map((language, index) => (
-              <button
-                key={language.value}
-                type="button"
-                role="tab"
-                id={`code-tab-${language.value}`}
-                aria-controls="code-editor-panel"
-                aria-selected={lang === language.value}
-                tabIndex={lang === language.value ? 0 : -1}
-                onClick={() => onLangChange(language.value)}
-                onKeyDown={(event) =>
-                  handleTabKeyboardNavigation(event, index, LANGS.length, (nextIndex) =>
-                    onLangChange(LANGS[nextIndex].value)
-                  )
-                }
-                className={
-                  "flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:min-h-9 " +
-                  (lang === language.value
-                    ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-700 dark:text-white"
-                    : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")
-                }
-              >
-                <EditorIcon name={language.icon} className="size-3.5" />
-                {language.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              role="tab"
-              id="code-tab-angular"
-              aria-selected="false"
-              aria-disabled="true"
-              disabled
-              tabIndex={-1}
-              className="flex min-h-11 shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-zinc-400 opacity-60 dark:text-zinc-500 sm:min-h-9"
-            >
-              <EditorIcon name="triangle" className="size-3.5" />
-              <span>Angular</span>
-              <span className="text-[10px] font-normal">Coming soon</span>
-            </button>
-          </div>
+            <EditorIcon name={activeLanguage.icon} className="size-3.5" />
+            {activeLanguage.label}
+          </button>
 
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <EditorTooltip label="Import code" align="right">
+              <button
+                type="button"
+                onClick={() => setImportDialogOpen(true)}
+                aria-label="Import code"
+                className="grid size-11 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white sm:size-9"
+              >
+                <EditorIcon name="arrow-up-right" />
+              </button>
+            </EditorTooltip>
             <EditorTooltip label="Preview data" align="right">
               <button
                 type="button"
@@ -153,12 +117,7 @@ export default function CodeEditorPanel({
           </div>
         </div>
 
-        <div
-          id="code-editor-panel"
-          role="tabpanel"
-          aria-labelledby={`code-tab-${lang}`}
-          className="bg-zinc-950 p-2"
-        >
+        <div className="bg-zinc-950 p-2">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 text-[11px] text-zinc-500">
             <span className="flex items-center gap-1.5 font-medium text-zinc-300">
               <EditorIcon name={activeLanguage.icon} className="size-3.5" />
@@ -175,16 +134,26 @@ export default function CodeEditorPanel({
             spellCheck={false}
             aria-label={`${activeLanguage.label} template code`}
             placeholder={
-              lang === "html"
-                ? "<div>...</div>"
-                : lang === "react"
-                  ? "export default function Template() {\n  return (...);\n}"
-                  : "@Component({ ... })\nexport class ... {}"
+              lang === "react"
+                ? "export default function Template() {\n  return (...);\n}"
+                : "<div>...</div>"
             }
             className="min-h-72 w-full resize-y rounded-b-xl bg-zinc-950 p-4 font-mono text-xs leading-6 text-zinc-200 outline-none placeholder:text-zinc-700 focus:bg-zinc-900 selection:bg-zinc-700"
           />
         </div>
       </section>
+
+      {importDialogOpen && (
+        <CodeImportDialog
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          initialType={lang === "react" ? "react" : "html"}
+          onImport={(importLang, source) => {
+            onImportCode(importLang, source);
+            setImportDialogOpen(false);
+          }}
+        />
+      )}
 
       {conversionDialogOpen && (
         <ConversionDisclaimerDialog
@@ -195,51 +164,6 @@ export default function CodeEditorPanel({
             onConvertToWysiwyg();
           }}
         />
-      )}
-
-      {(lang === "html" || lang === "react") && code.trim() && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-200 p-3 dark:border-zinc-800">
-            <PreviewHeader label={`Preview (${lang === "react" ? "React" : "HTML"})`} />
-            <PreviewExportActions
-              title={title}
-              previewRenderer={(target, options) => {
-                const preview = sandboxPreviewRef.current;
-                if (!preview) return Promise.reject(new Error("Preview is not ready yet."));
-                return preview.renderImages(target, options);
-              }}
-            />
-          </div>
-          <div className="max-h-[32rem] overflow-auto bg-zinc-100/70 p-5 dark:bg-zinc-950/50">
-            <div className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-inner dark:border-zinc-800">
-              <SandboxedCodePreview
-                ref={sandboxPreviewRef}
-                mode={lang}
-                code={code}
-                metadata={metadata}
-              />
-            </div>
-          </div>
-        </section>
-      )}
-
-      {lang === "angular" && (
-        <div
-          role="status"
-          className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-zinc-200/70 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-            <EditorIcon name="info" />
-          </span>
-          <div>
-            <p className="font-medium text-zinc-800 dark:text-zinc-100">
-              Browser preview unavailable
-            </p>
-            <p className="mt-0.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-              Angular code is stored with the template and remains available through the API and code export.
-            </p>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -323,16 +247,5 @@ function ConversionDisclaimerDialog({
         </div>
       </div>
     </AccessibleDialog>
-  );
-}
-
-function PreviewHeader({ label }: { label: string }) {
-  return (
-    <p className="flex h-9 items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-      <span className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-        <EditorIcon name="eye" />
-      </span>
-      {label}
-    </p>
   );
 }

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import BlockInspector from "@/components/dashboard/templates/block-inspector";
 import CanvasPanel from "@/components/dashboard/templates/canvas-panel";
 import CodeEditorPanel from "@/components/dashboard/templates/code-editor-panel";
-import CodeOutput from "@/components/dashboard/templates/code-output";
 import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
 import {
   EditorIcon,
@@ -17,7 +17,7 @@ import MetadataDialog from "@/components/dashboard/templates/metadata-dialog";
 import MobileEditorActions, {
   type MobileEditorAction,
 } from "@/components/dashboard/templates/mobile-editor-actions";
-import OutputDrawer from "@/components/dashboard/templates/output-drawer";
+import PreviewDialog from "@/components/dashboard/templates/preview-dialog";
 import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
 import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
 import WorkspaceSheet from "@/components/dashboard/templates/workspace-sheet";
@@ -48,7 +48,7 @@ import {
   type TemplateCanvas,
   type TemplateMetadata,
 } from "../types";
-import { getTemplate, updateTemplate } from "../queries";
+import { createTemplate, getTemplate, updateTemplate } from "../queries";
 import {
   listCanvases,
   getCanvas,
@@ -61,6 +61,8 @@ type PanelTab = "commands" | "canvas" | "block";
 type EditorMode = "wysiwyg" | "code";
 
 export default function TemplateEditorPage({ templateId }: { templateId: string }) {
+  const router = useRouter();
+  const isDraft = templateId === "new";
   const [mode, setMode] = useState<EditorMode>("wysiwyg");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -72,7 +74,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [previewMetadata, setPreviewMetadata] = useState<TemplateMetadata>([]);
   const [metadataOpen, setMetadataOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [outputOpen, setOutputOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
@@ -97,11 +99,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   useEffect(() => {
     history.setCurrent({ blocks, canvas, title, description });
-  });
+  }, [history, blocks, canvas, title, description]);
 
   useEffect(() => {
     codeHistory.setCurrent(codeSnapshot());
-  });
+  }, [codeHistory, codeBuffers, title, description]);
 
   function snapshot(): TemplateSnapshot {
     return { blocks, canvas, title, description };
@@ -164,6 +166,13 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }, []);
 
   const loadTemplate = useCallback(async () => {
+    if (isDraft) {
+      const now = new Date().toISOString();
+      setCanvases([{ id: "draft-canvas", title: "Canvas", position: 0, createdAt: now, updatedAt: now }]);
+      setActiveCanvasId("draft-canvas");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     setError(null);
@@ -187,7 +196,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     } finally {
       setLoading(false);
     }
-  }, [loadCanvasContent, templateId]);
+  }, [loadCanvasContent, templateId, isDraft]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -195,6 +204,28 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadTemplate]);
+
+  useEffect(() => {
+    if (!isDraft || !dirty) return;
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+
+    function handlePopState() {
+      if (dirty && !window.confirm("You have unsaved changes. Leave anyway?")) {
+        window.history.pushState(null, "", window.location.href);
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [isDraft, dirty]);
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
@@ -276,7 +307,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   function handleMobileAction(action: MobileEditorAction) {
     if (action === "preview") {
-      setMobileAction("preview");
+      setPreviewOpen(true);
       return;
     }
     setPanelTab(action === "add" ? "commands" : action);
@@ -453,20 +484,38 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setSaving(true);
     setError(null);
     try {
-      await updateCanvas(templateId, activeCanvasId, {
-        content: { version: 4, canvas, blocks, metadata: [] },
-        html: generated.html,
-        react: generated.react,
-        angular: generated.angular,
-      });
-      await updateTemplate(templateId, {
-        title,
-        description,
-        isPrivate,
-        isCode: mode === "code",
-      });
-      setSavedAt(new Date().toLocaleString());
-      setDirty(false);
+      if (isDraft) {
+        const created = await createTemplate({
+          title: title || "Untitled",
+          description,
+          isPrivate,
+          isCode: mode === "code",
+        });
+        const canvasId = created.canvases?.[0]?.id;
+        if (!canvasId) throw new Error("Canvas was not created");
+        await updateCanvas(created.id, canvasId, {
+          content: { version: 4, canvas, blocks, metadata: [] },
+          html: generated.html,
+          react: generated.react,
+          angular: generated.angular,
+        });
+        router.replace(`/dashboard/templates/${created.id}`);
+      } else {
+        await updateCanvas(templateId, activeCanvasId, {
+          content: { version: 4, canvas, blocks, metadata: [] },
+          html: generated.html,
+          react: generated.react,
+          angular: generated.angular,
+        });
+        await updateTemplate(templateId, {
+          title,
+          description,
+          isPrivate,
+          isCode: mode === "code",
+        });
+        setSavedAt(new Date().toLocaleString());
+        setDirty(false);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -491,6 +540,13 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   function handleCodeChange(langKey: CodeLang, value: string) {
     codeHistory.checkpoint(codeSnapshot(), `code:${langKey}`);
     setCodeBuffers((prev) => ({ ...prev, [langKey]: value }));
+    markDirty();
+  }
+
+  function handleImportCode(importLang: "html" | "react", source: string) {
+    codeHistory.checkpoint(codeSnapshot(), `import:${importLang}`);
+    setLang(importLang);
+    setCodeBuffers((prev) => ({ ...prev, [importLang]: source }));
     markDirty();
   }
 
@@ -523,7 +579,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   async function handleAddCanvas() {
-    if (creatingCanvas) return;
+    if (creatingCanvas || isDraft) return;
     setCreatingCanvas(true);
     try {
       const newCanvas = await createCanvas(templateId);
@@ -537,7 +593,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   async function handleSwitchCanvas(canvasId: string) {
-    if (canvasId === activeCanvasId) return;
+    if (canvasId === activeCanvasId || isDraft) return;
 
     if (activeCanvasId && dirty) {
       try {
@@ -568,9 +624,11 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     setCanvases((prev) =>
       prev.map((c) => (c.id === canvasId ? { ...c, title: newTitle } : c))
     );
-    updateCanvas(templateId, canvasId, { title: newTitle }).catch((err) => {
-      setError((err as Error).message);
-    });
+    if (!isDraft) {
+      updateCanvas(templateId, canvasId, { title: newTitle }).catch((err) => {
+        setError((err as Error).message);
+      });
+    }
   }
 
   function handleDeleteCanvasRequest(canvasId: string) {
@@ -678,6 +736,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           onRedo={handleRedo}
           onSelectAll={handleSelectAll}
           onPreviewData={() => setMetadataOpen(true)}
+          onPreview={() => setPreviewOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onSave={handleSave}
           canvasSelector={
@@ -790,32 +849,16 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               </div>
             </aside>
           </div>
-
-              <OutputDrawer
-                open={outputOpen}
-                onOpenChange={setOutputOpen}
-                title="Preview and export"
-                className="hidden lg:block"
-              >
-                <CodeOutput
-                  title={title}
-                  html={generated.html}
-                  previewHtml={generated.previewHtml}
-                  reactCode={generated.react}
-                  angularCode={generated.angular}
-                />
-              </OutputDrawer>
             </>
           ) : (
             <CodeEditorPanel
-              title={title}
               lang={lang}
-              onLangChange={setLang}
               code={codeBuffers[lang]}
               onCodeChange={(value) => handleCodeChange(lang, value)}
               metadata={previewMetadata}
               onOpenMetadata={() => setMetadataOpen(true)}
               onConvertToWysiwyg={handleConvertToWysiwyg}
+              onImportCode={handleImportCode}
             />
           )}
         </main>
@@ -833,9 +876,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               ? "Add blocks"
               : mobileAction === "block"
                 ? "Edit block"
-                : mobileAction === "canvas"
-                  ? "Canvas"
-                  : "Preview and export"
+                : "Canvas"
           }
           placement="bottom"
           onClose={() => setMobileAction(null)}
@@ -850,17 +891,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               onStyleChange={patchSelectedStyle}
               onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
             />
-          ) : mobileAction === "canvas" ? (
+          ) : (
             <CanvasPanel canvas={canvas} onChange={patchCanvas} />
-          ) : mobileAction === "preview" ? (
-            <CodeOutput
-              title={title}
-              html={generated.html}
-              previewHtml={generated.previewHtml}
-              reactCode={generated.react}
-              angularCode={generated.angular}
-            />
-          ) : null}
+          )}
         </WorkspaceSheet>
       ) : null}
 
@@ -879,6 +912,19 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
         isPrivate={isPrivate}
         onClose={() => setSettingsOpen(false)}
         onSave={handleSettingsSave}
+      />
+
+      <PreviewDialog
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={title}
+        mode={mode}
+        lang={lang}
+        code={codeBuffers[lang]}
+        metadata={previewMetadata}
+        previewHtml={generated.previewHtml}
+        html={generated.html}
+        react={generated.react}
       />
 
       <ConfirmDialog

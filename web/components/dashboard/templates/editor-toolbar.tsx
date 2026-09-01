@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { DraftTextInput } from "./draft-inputs";
-import { EditorIcon } from "./editor-controls";
+import { EditorIcon, EditorTooltip } from "./editor-controls";
 
 type EditorMode = "wysiwyg" | "code";
 
@@ -28,6 +28,7 @@ interface EditorToolbarProps {
   onRedo: () => void;
   onSelectAll: () => void;
   onPreviewData: () => void;
+  onPreview: () => void;
   onSettings: () => void;
   onSave: () => void;
 }
@@ -52,6 +53,7 @@ export default function EditorToolbar({
   onRedo,
   onSelectAll,
   onPreviewData,
+  onPreview,
   onSettings,
   onSave,
 }: EditorToolbarProps) {
@@ -70,13 +72,15 @@ export default function EditorToolbar({
         aria-label="Template editor toolbar"
         className="flex flex-wrap items-center gap-2 px-3 py-2"
       >
-        <Link
-          href="/dashboard/templates"
-          aria-label="Back to templates"
-          className={buttonClassName("ghost", "icon")}
-        >
-          <EditorIcon name="arrow-left" />
-        </Link>
+        <EditorTooltip label="Back to templates" align="right">
+          <Link
+            href="/dashboard/templates"
+            aria-label="Back to templates"
+            className={buttonClassName("ghost", "icon")}
+          >
+            <EditorIcon name="arrow-left" />
+          </Link>
+        </EditorTooltip>
 
         <div className="min-w-32 flex-1 sm:max-w-sm">
           <DraftTextInput
@@ -123,33 +127,50 @@ export default function EditorToolbar({
           <Button variant="ghost" size="compact" onClick={onRedo} disabled={!canRedo}>
             Redo
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={allSelected ? "Clear block selection" : "Select all blocks"}
-            onClick={onSelectAll}
-            disabled={!canSelectAll}
+          <EditorTooltip
+            label={
+              allSelected ? "Clear block selection" : "Select all blocks"
+            }
           >
-            <EditorIcon name={allSelected ? "square-check" : "box-select"} />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={allSelected ? "Clear block selection" : "Select all blocks"}
+              onClick={onSelectAll}
+              disabled={!canSelectAll}
+            >
+              <EditorIcon name={allSelected ? "square-check" : "box-select"} />
+            </Button>
+          </EditorTooltip>
         </div>
 
         <div className="ml-auto flex items-center gap-1">
           <span role="status" className="sr-only text-xs text-text-muted xl:not-sr-only">
             {status}
           </span>
-          <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Preview data" onClick={onPreviewData}>
-            <EditorIcon name="file-json" />
-            {previewDataCount > 0 ? (
-              <span className="sr-only">{previewDataCount} fields</span>
-            ) : null}
-          </Button>
-          <Button className="lg:hidden" variant="ghost" size="icon" aria-label="More template actions" onClick={onSettings}>
-            <EditorIcon name="settings" />
-          </Button>
-          <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Template settings" onClick={onSettings}>
-            <EditorIcon name="settings" />
-          </Button>
+          <EditorTooltip label="Preview" align="right">
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Preview" onClick={onPreview}>
+              <EditorIcon name="eye" />
+            </Button>
+          </EditorTooltip>
+          <EditorTooltip label="Preview data" align="right">
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Preview data" onClick={onPreviewData}>
+              <EditorIcon name="file-json" />
+              {previewDataCount > 0 ? (
+                <span className="sr-only">{previewDataCount} fields</span>
+              ) : null}
+            </Button>
+          </EditorTooltip>
+          <EditorTooltip label="More template actions" align="right">
+            <Button className="lg:hidden" variant="ghost" size="icon" aria-label="More template actions" onClick={onSettings}>
+              <EditorIcon name="settings" />
+            </Button>
+          </EditorTooltip>
+          <EditorTooltip label="Template settings" align="right">
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Template settings" onClick={onSettings}>
+              <EditorIcon name="settings" />
+            </Button>
+          </EditorTooltip>
           <Button onClick={onSave} disabled={saving} aria-label="Save template" size="compact">
             <EditorIcon
               name={saving ? "loader-circle" : "save"}

@@ -1,11 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 const queries = vi.hoisted(() => ({
   listTemplates: vi.fn(),
-  createTemplate: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -84,29 +83,15 @@ describe("DashboardPage", () => {
   });
 
   it("announces direct creation, routes to the new editor, and rejects re-entrant creation", async () => {
-    let resolveCreate: (template: { id: string }) => void = () => undefined;
-    const createdTemplate = new Promise<{ id: string }>((resolve) => {
-      resolveCreate = resolve;
-    });
-    let reentered = false;
-    queries.createTemplate.mockImplementation(() => {
-      if (!reentered) {
-        reentered = true;
-        fireEvent.click(screen.getByRole("button", { name: "Create template" }));
-      }
-      return createdTemplate;
-    });
-
     render(<DashboardPage name="Nicole" />);
     fireEvent.click(screen.getByRole("button", { name: "Create template" }));
 
     expect(screen.getByRole("button", { name: "Creating template..." })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Creating template...");
-    expect(queries.createTemplate).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith("/dashboard/templates/new");
 
-    resolveCreate({ id: "new-template" });
-    await waitFor(() => {
-      expect(router.push).toHaveBeenCalledWith("/dashboard/templates/new-template");
-    });
+    // Second click should be rejected
+    fireEvent.click(screen.getByRole("button", { name: "Creating template..." }));
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 });

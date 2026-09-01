@@ -31,6 +31,7 @@ export const FONT_OPTIONS: FontOption[] = [
   webSafe("Georgia", "Georgia, 'Times New Roman', serif"),
   webSafe("Times New Roman", "'Times New Roman', Times, serif"),
   webSafe("Courier New", "'Courier New', Courier, monospace"),
+  webSafe("Monospace", "monospace"),
   google("Inter", `wght@${GOOGLE_WEIGHTS}`),
   google("Roboto", `wght@${GOOGLE_WEIGHTS}`),
   google("Open Sans", `wght@${GOOGLE_WEIGHTS}`),

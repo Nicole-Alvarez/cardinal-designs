@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CANVAS } from "../types";
 
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const queries = vi.hoisted(() => ({
   getTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  createTemplate: vi.fn(),
 }));
 const canvasQueries = vi.hoisted(() => ({
   listCanvases: vi.fn(),
@@ -15,6 +17,7 @@ const canvasQueries = vi.hoisted(() => ({
   deleteCanvas: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("../queries", () => queries);
 vi.mock("../canvas-queries", () => canvasQueries);
 vi.mock("@/components/dashboard/templates/editor-canvas", () => ({

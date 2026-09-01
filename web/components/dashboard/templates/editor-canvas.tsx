@@ -751,9 +751,10 @@ export default function EditorCanvas({
         className="min-h-96 overflow-auto rounded-2xl border bg-zinc-50 p-8 shadow-sm dark:bg-zinc-950/40 lg:h-full lg:min-h-0"
         style={{ cursor: panning ? "grabbing" : undefined }}
       >
+        <div className="flex min-h-full">
         <div
           data-testid="canvas-pan-layer"
-          className="relative mx-auto"
+          className="relative m-auto"
           style={{
             width: size.width * scale,
             height: size.height * scale,
@@ -916,6 +917,7 @@ export default function EditorCanvas({
               }
             />
           </div>
+        </div>
         </div>
       </div>
     </div>

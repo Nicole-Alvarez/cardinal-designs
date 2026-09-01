@@ -363,4 +363,27 @@ describe("EditorCanvas drag-to-add", () => {
     expect(remove.querySelector("svg")).not.toBeNull();
     expect(remove).toHaveClass("dark:hover:text-white");
   });
+
+  it("centers the canvas on both axes inside a full-height flex wrapper", () => {
+    render(
+      <EditorCanvas
+        canvas={{ ...DEFAULT_CANVAS, width: "400px", height: "240px" }}
+        blocks={[]}
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        onMove={vi.fn()}
+        onResize={vi.fn()}
+        onAddAt={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    const panLayer = screen.getByTestId("canvas-pan-layer");
+    expect(panLayer).toHaveClass("m-auto");
+    expect(panLayer).not.toHaveClass("mx-auto");
+
+    const wrap = panLayer.parentElement;
+    expect(wrap).not.toBeNull();
+    expect(wrap).toHaveClass("flex", "min-h-full");
+  });
 });

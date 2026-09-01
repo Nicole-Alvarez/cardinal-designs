@@ -10,6 +10,7 @@ export default function PreviewExportActions({
   title,
   previewRef,
   previewRenderer,
+  tooltipPlacement = "bottom",
 }: {
   title: string;
   previewRef?: RefObject<HTMLElement | null>;
@@ -17,6 +18,7 @@ export default function PreviewExportActions({
     target: "batch" | "cards",
     options: { pixelRatio: number; allowFontFallback: boolean }
   ) => Promise<RenderedPreviewImage[]>;
+  tooltipPlacement?: "top" | "bottom";
 }) {
   const [exporting, setExporting] = useState<"print" | "png" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -134,6 +136,7 @@ export default function PreviewExportActions({
         <EditorTooltip
           label={exporting === "print" ? "Preparing print…" : "Print preview"}
           align="right"
+          placement={tooltipPlacement}
         >
           <button
             type="button"
@@ -151,6 +154,7 @@ export default function PreviewExportActions({
         <EditorTooltip
           label={exporting === "png" ? "Exporting PNG…" : "Download preview as PNG"}
           align="right"
+          placement={tooltipPlacement}
         >
           <button
             type="button"

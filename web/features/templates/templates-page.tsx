@@ -7,7 +7,6 @@ import TemplatesTable from "@/components/dashboard/templates/templates-table";
 import ConfirmDialog from "@/components/dashboard/templates/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  createTemplate,
   deleteTemplate,
   listTemplates,
 } from "./queries";
@@ -47,8 +46,7 @@ export default function TemplatesPage() {
     setCreating(true);
     setError(null);
     try {
-      const template = await createTemplate();
-      router.push(`/dashboard/templates/${template.id}`);
+      router.push("/dashboard/templates/new");
     } catch (err) {
       setError((err as Error).message);
       setCreating(false);

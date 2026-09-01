@@ -28,7 +28,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
-    res.status(201).json({ template: await create(req.user!.id) });
+    res.status(201).json({ template: await create(req.user!.id, req.body) });
   } catch (err) {
     handleError(res, err);
   }

@@ -21,6 +21,7 @@ const baseProps = {
   onRedo: vi.fn(),
   onSelectAll: vi.fn(),
   onPreviewData: vi.fn(),
+  onPreview: vi.fn(),
   onSettings: vi.fn(),
   onSave: vi.fn(),
 };
@@ -45,9 +46,28 @@ describe("EditorToolbar", () => {
     render(<EditorToolbar {...baseProps} />);
 
     expect(screen.getByRole("button", { name: "Save template" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Preview" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Preview data" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Template settings" })).toBeEnabled();
     expect(screen.getByRole("status")).toHaveTextContent("Unsaved changes");
+  });
+
+  it("attaches a tooltip to each icon-only toolbar button", () => {
+    render(<EditorToolbar {...baseProps} />);
+
+    const tooltips = Array.from(screen.getAllByRole("tooltip")).map(
+      (node) => node.textContent
+    );
+    for (const label of [
+      "Back to templates",
+      "Select all blocks",
+      "Preview",
+      "Preview data",
+      "More template actions",
+      "Template settings",
+    ]) {
+      expect(tooltips).toContain(label);
+    }
   });
 
   it.each([

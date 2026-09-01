@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { TemplateCanvas } from "@/features/templates/types";
+import { uploadBlockImage } from "@/features/templates/queries";
 import ImageSourceNotice from "./image-source-notice";
 import { ColorInput, Field, NumberInput, SizeSelect } from "./inspector-controls";
 
@@ -38,10 +40,30 @@ export default function CanvasPanel({
   canvas: TemplateCanvas;
   onChange: (patch: Partial<TemplateCanvas>) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const allPresets = CANVAS_PRESETS.flatMap((group) => group.items);
   const matchedPreset = allPresets.find(
     (p) => p.width === canvas.width && p.height === canvas.height
   );
+
+  async function handleUploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const url = await uploadBlockImage(file);
+      onChange({ overlayImage: url });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -97,13 +119,38 @@ export default function CanvasPanel({
 
       <Field label="Overlay image URL">
         <div className="space-y-1">
-          <input
-            value={canvas.overlayImage}
-            onChange={(e) => onChange({ overlayImage: e.target.value })}
-            placeholder="https://... (transparent PNG works best)"
-            className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-border-strong focus:ring-2 focus:ring-focus"
-          />
+          <div className="flex items-center gap-1">
+            <input
+              value={canvas.overlayImage}
+              onChange={(e) => onChange({ overlayImage: e.target.value })}
+              placeholder="https://... (transparent PNG works best)"
+              className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-2 px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-border-strong focus:ring-2 focus:ring-focus"
+            />
+            <button
+              type="button"
+              disabled={uploading}
+              aria-busy={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="min-h-11 shrink-0 rounded-lg border border-border-subtle bg-surface-2 px-3 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
+            >
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+          </div>
+          {uploadError && (
+            <p role="alert" className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
+          )}
+          <span className="sr-only" aria-live="polite">
+            {uploading ? "Uploading image" : canvas.overlayImage ? "Image source ready" : ""}
+          </span>
           <ImageSourceNotice source={canvas.overlayImage} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            aria-label="Overlay image URL upload"
+            className="hidden"
+            onChange={handleUploadFile}
+          />
         </div>
       </Field>
 
