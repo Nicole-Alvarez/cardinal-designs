@@ -6,6 +6,11 @@ export async function listTemplates(): Promise<TemplateSummary[]> {
   return data.templates ?? [];
 }
 
+export async function getCurrentUserConfiguration() {
+  const data = await apiFetch("/api/auth/me/configuration", { credentials: "include" });
+  return data.configuration as { canUseGenerateAI: boolean; metadataEnabled: boolean; canDownloadAssets: boolean };
+}
+
 export async function getTemplate(id: string): Promise<Template> {
   const data = await apiFetch(`/api/templates/${id}`, {
     credentials: "include",

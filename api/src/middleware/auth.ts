@@ -5,7 +5,7 @@ import prisma from "../prisma";
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; username: string; name: string | null };
+      user?: { id: string; username: string; name: string | null; role: string; status: string };
     }
   }
 }
@@ -29,7 +29,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     id: session.user.id,
     username: session.user.username,
     name: session.user.name,
+    role: session.user.role,
+    status: session.user.status,
   };
 
+  next();
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Administrator access is required", code: "ADMIN_REQUIRED" });
   next();
 }

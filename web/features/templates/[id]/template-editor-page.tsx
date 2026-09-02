@@ -51,7 +51,7 @@ import {
   type TemplateCanvas,
   type TemplateMetadata,
 } from "../types";
-import { createTemplate, generateAiImageBlock, getTemplate, updateTemplate } from "../queries";
+import { createTemplate, generateAiImageBlock, getCurrentUserConfiguration, getTemplate, updateTemplate } from "../queries";
 import {
   listCanvases,
   getCanvas,
@@ -81,6 +81,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [aiImageOpen, setAiImageOpen] = useState(false);
   const [zipExportOpen, setZipExportOpen] = useState(false);
+  const [userConfiguration, setUserConfiguration] = useState<{ canUseGenerateAI: boolean; metadataEnabled: boolean; canDownloadAssets: boolean } | null>(null);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<PanelTab>("canvas");
@@ -487,6 +488,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [selectedIds.length]);
 
+  useEffect(() => { void getCurrentUserConfiguration().then(setUserConfiguration).catch(() => setUserConfiguration({ canUseGenerateAI: false, metadataEnabled: false, canDownloadAssets: false })); }, []);
+
   async function handleSave() {
     if (!activeCanvasId) return;
     setSaving(true);
@@ -775,9 +778,12 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           onUndo={handleUndo}
           onRedo={handleRedo}
           onSelectAll={handleSelectAll}
-          onPreviewData={() => setMetadataOpen(true)}
-          onAiCreate={() => setAiCreateOpen(true)}
-          onZipExport={() => setZipExportOpen(true)}
+          onPreviewData={() => userConfiguration?.metadataEnabled && setMetadataOpen(true)}
+          onAiCreate={() => userConfiguration?.canUseGenerateAI && setAiCreateOpen(true)}
+          onZipExport={() => userConfiguration?.canDownloadAssets && setZipExportOpen(true)}
+          canUseGenerateAI={userConfiguration?.canUseGenerateAI ?? false}
+          metadataEnabled={userConfiguration?.metadataEnabled ?? false}
+          canDownloadAssets={userConfiguration?.canDownloadAssets ?? false}
           onPreview={() => setPreviewOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onSave={handleSave}

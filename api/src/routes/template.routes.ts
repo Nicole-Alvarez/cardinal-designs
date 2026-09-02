@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth";
 import { AiTemplateError, createAiLayout, createAiReferenceLayout } from "../services/ai-template.service";
 import { validateReferenceImage } from "../services/reference-image.service";
 import { UploadsError } from "../services/uploads.service";
+import { requireUserFeature, UserConfigurationError } from "../services/user-configuration.service";
 import {
   TemplateError,
   create,
@@ -61,10 +62,11 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/ai-create", requireAuth, aiCreateLimiter, async (req: Request, res: Response) => {
   try {
+    await requireUserFeature(req.user!.id, "canUseGenerateAI");
     const { prompt, canvas } = req.body ?? {};
     res.json({ content: await createAiLayout(prompt, canvas) });
   } catch (err) {
-    if (err instanceof AiTemplateError) {
+    if (err instanceof AiTemplateError || err instanceof UserConfigurationError) {
       return res.status(err.statusCode).json({ error: err.message });
     }
     res.status(500).json({ error: "Internal server error" });
@@ -73,13 +75,14 @@ router.post("/ai-create", requireAuth, aiCreateLimiter, async (req: Request, res
 
 router.post("/ai-create/reference", requireAuth, aiCreateLimiter, referenceUploadSingle, handleReferenceUploadMiddleware, async (req: Request, res: Response) => {
   try {
+    await requireUserFeature(req.user!.id, "canUseGenerateAI");
     if (!req.file) return res.status(400).json({ error: "A reference image is required" });
     const canvas = typeof req.body?.canvas === "string" ? JSON.parse(req.body.canvas) : null;
     const reference = validateReferenceImage(req.file);
     res.json({ content: await createAiReferenceLayout(req.body?.prompt ?? "", canvas, reference, req.body?.mode) });
   } catch (err) {
     if (err instanceof SyntaxError) return res.status(400).json({ error: "Canvas is invalid" });
-    if (err instanceof UploadsError || err instanceof AiTemplateError) return res.status(err.statusCode).json({ error: err.message });
+    if (err instanceof UploadsError || err instanceof AiTemplateError || err instanceof UserConfigurationError) return res.status(err.statusCode).json({ error: err.message });
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma";
+import { getUserConfiguration } from "./user-configuration.service";
 
 export class CanvasError extends Error {
   constructor(message: string, public statusCode = 400) {
@@ -73,6 +74,11 @@ export async function create(
   userId: string
 ): Promise<CanvasFull> {
   await verifyTemplateOwnership(templateId, userId);
+  const configuration = await getUserConfiguration(userId);
+  const canvasCount = await prisma.canvas.count({ where: { templateId } });
+  if (canvasCount >= configuration.canvasLimitPerTemplate) {
+    throw new CanvasError("Canvas limit reached for this template", 403);
+  }
 
   const maxPosition = await prisma.canvas.aggregate({
     where: { templateId },

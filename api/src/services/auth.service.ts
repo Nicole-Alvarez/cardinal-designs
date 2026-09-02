@@ -41,7 +41,7 @@ export async function login({ username, password }: LoginInput) {
   return {
     token,
     expiresAt,
-    user: { id: user.id, username: user.username, name: user.name, role: user.role },
+    user: { id: user.id, username: user.username, name: user.name, role: user.role, status: user.status },
   };
 }
 
@@ -60,7 +60,7 @@ export async function register({ username, password, name }: RegisterInput) {
 
   const passwordHash = await argon2.hash(password);
   const user = await prisma.user.create({
-    data: { username, passwordHash, name, role: "member" },
+    data: { username, passwordHash, name, role: "member", configuration: { create: {} } },
   });
 
   const token = crypto.randomBytes(32).toString("hex");
@@ -73,7 +73,7 @@ export async function register({ username, password, name }: RegisterInput) {
   return {
     token,
     expiresAt,
-    user: { id: user.id, username: user.username, name: user.name, role: user.role },
+    user: { id: user.id, username: user.username, name: user.name, role: user.role, status: user.status },
   };
 }
 
@@ -85,7 +85,7 @@ export async function logout(token?: string) {
 export async function me(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, name: true, role: true },
+    select: { id: true, username: true, name: true, role: true, status: true },
   });
   if (!user) {
     throw new AuthError("User not found", 404);

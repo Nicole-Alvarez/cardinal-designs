@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "../config";
 import { requireAuth } from "../middleware/auth";
 import { AuthError, login, logout, me, register } from "../services/auth.service";
+import { getUserConfiguration } from "../services/user-configuration.service";
 
 const router = Router();
 
@@ -75,6 +76,10 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
     }
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+router.get("/me/configuration", requireAuth, async (req: Request, res: Response) => {
+  res.json({ configuration: await getUserConfiguration(req.user!.id) });
 });
 
 export default router;

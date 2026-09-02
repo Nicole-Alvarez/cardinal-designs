@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma";
+import { getUserConfiguration } from "./user-configuration.service";
 
 export class TemplateError extends Error {
   constructor(message: string, public statusCode = 400) {
@@ -79,6 +80,11 @@ export async function create(
   userId: string,
   input?: CreateTemplateInput
 ): Promise<Template> {
+  const configuration = await getUserConfiguration(userId);
+  const count = await prisma.template.count({ where: { userId } });
+  if (count >= configuration.templateLimit) {
+    throw new TemplateError("Template limit reached for this account", 403);
+  }
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const title = input?.title?.trim() || `Untitled-${randomSuffix()}`;

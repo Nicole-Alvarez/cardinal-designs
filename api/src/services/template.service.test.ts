@@ -7,15 +7,23 @@ const prisma = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    count: vi.fn(),
   },
 }));
 
+const configuration = vi.hoisted(() => ({ getUserConfiguration: vi.fn() }));
+
 vi.mock("../prisma", () => ({ default: prisma }));
+vi.mock("./user-configuration.service", () => configuration);
 
 import { create, getById, list, remove, update } from "./template.service";
 
 describe("template ownership", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configuration.getUserConfiguration.mockResolvedValue({ templateLimit: 5 });
+    prisma.template.count.mockResolvedValue(0);
+  });
 
   it("lists only templates owned by the authenticated user", async () => {
     prisma.template.findMany.mockResolvedValue([]);
@@ -48,6 +56,12 @@ describe("template ownership", () => {
         data: expect.objectContaining({ userId: "user-a", description: "" }),
       })
     );
+  });
+
+  it("rejects new templates when the owner's limit is reached", async () => {
+    configuration.getUserConfiguration.mockResolvedValue({ templateLimit: 1 });
+    prisma.template.count.mockResolvedValue(1);
+    await expect(create("user-a")).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("trims a valid description", async () => {

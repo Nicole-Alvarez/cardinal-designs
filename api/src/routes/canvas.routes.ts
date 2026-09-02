@@ -11,6 +11,7 @@ import {
 } from "../services/canvas.service";
 import { generateImageBlockAsset } from "../services/ai-image.service";
 import { AiTemplateError } from "../services/ai-template.service";
+import { requireUserFeature, UserConfigurationError } from "../services/user-configuration.service";
 
 const router = Router({ mergeParams: true });
 
@@ -61,6 +62,7 @@ router.put("/:canvasId", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/:canvasId/ai-images/:blockId", requireAuth, async (req: Request, res: Response) => {
   try {
+    await requireUserFeature(req.user!.id, "canUseGenerateAI");
     const { templateId, canvasId, blockId } = req.params;
     const canvas = await getById(canvasId, templateId, req.user!.id);
     const content = canvas.content && typeof canvas.content === "object" && !Array.isArray(canvas.content)
@@ -76,7 +78,7 @@ router.post("/:canvasId/ai-images/:blockId", requireAuth, async (req: Request, r
     const updated = await setGeneratedImageSource(canvasId, templateId, req.user!.id, blockId, uploaded.url);
     res.json({ canvas: updated, url: uploaded.url });
   } catch (err) {
-    if (err instanceof CanvasError || err instanceof AiTemplateError) return res.status(err.statusCode).json({ error: err.message });
+    if (err instanceof CanvasError || err instanceof AiTemplateError || err instanceof UserConfigurationError) return res.status(err.statusCode).json({ error: err.message });
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -30,6 +30,9 @@ interface EditorToolbarProps {
   onPreviewData: () => void;
   onAiCreate: () => void;
   onZipExport?: () => void;
+  canUseGenerateAI?: boolean;
+  metadataEnabled?: boolean;
+  canDownloadAssets?: boolean;
   onPreview: () => void;
   onSettings: () => void;
   onSave: () => void;
@@ -57,6 +60,9 @@ export default function EditorToolbar({
   onPreviewData,
   onAiCreate,
   onZipExport,
+  canUseGenerateAI = true,
+  metadataEnabled = true,
+  canDownloadAssets = true,
   onPreview,
   onSettings,
   onSave,
@@ -158,12 +164,12 @@ export default function EditorToolbar({
             </Button>
           </EditorTooltip>
           <EditorTooltip label="Create with AI" align="right">
-            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Create with AI" onClick={onAiCreate}>
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Create with AI" onClick={onAiCreate} disabled={!canUseGenerateAI}>
               <EditorIcon name="sparkles" />
             </Button>
           </EditorTooltip>
           {onZipExport ? <EditorTooltip label="Download template ZIP" align="right">
-            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Download template ZIP" onClick={onZipExport}>
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" aria-label="Download template ZIP" onClick={onZipExport} disabled={!canDownloadAssets}>
               <EditorIcon name="folder-archive" />
             </Button>
           </EditorTooltip> : null}

@@ -15,6 +15,12 @@ export const MENU_ITEMS: MenuItem[] = [
     allowedRoles: ["admin", "member"],
   },
   {
+    label: "Users",
+    href: "/dashboard/users",
+    icon: "users",
+    allowedRoles: ["admin"],
+  },
+  {
     label: "Templates",
     href: "/dashboard/templates",
     icon: "layout-template",
