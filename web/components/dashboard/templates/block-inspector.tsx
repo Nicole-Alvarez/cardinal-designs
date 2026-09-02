@@ -35,6 +35,9 @@ interface BlockInspectorProps {
   onChange: (patch: Partial<TemplateBlock>) => void;
   onStyleChange: (patch: Partial<BlockStyle>) => void;
   onStack: (dir: "front" | "back") => void;
+  onGenerateAiImage?: () => void;
+  aiImageStatus?: "pending" | "generating" | "uploading" | "completed" | "failed";
+  aiImageError?: string | null;
 }
 
 export default function BlockInspector({
@@ -43,6 +46,9 @@ export default function BlockInspector({
   onChange,
   onStyleChange,
   onStack,
+  onGenerateAiImage,
+  aiImageStatus,
+  aiImageError,
 }: BlockInspectorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -202,10 +208,17 @@ export default function BlockInspector({
                 >
                   {uploading ? "Uploading…" : "Upload"}
                 </button>
+                {!block.src && onGenerateAiImage ? <button
+                  type="button"
+                  disabled={uploading || aiImageStatus === "generating" || aiImageStatus === "uploading"}
+                  onClick={onGenerateAiImage}
+                  className="min-h-11 shrink-0 rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >{aiImageStatus === "generating" ? "Generating…" : aiImageStatus === "uploading" ? "Uploading…" : "Generate AI"}</button> : null}
               </div>
               {uploadError && (
                 <p role="alert" className="text-xs text-red-500 dark:text-red-400">{uploadError}</p>
               )}
+              {aiImageError ? <p role="alert" className="text-xs text-red-500 dark:text-red-400">{aiImageError}</p> : null}
               <span className="sr-only" aria-live="polite">
                 {uploading ? "Uploading image" : block.src ? "Image source ready" : ""}
               </span>

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { AI_LAYOUT_RESPONSE_SCHEMA, normalizeAiLayout, openAiErrorDetails, retryAfterSeconds } from "./ai-template.service";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { config } from "../config";
+import { AI_LAYOUT_RESPONSE_SCHEMA, createAiLayout, normalizeAiLayout, openAiErrorDetails, retryAfterSeconds } from "./ai-template.service";
 
 const canvas = {
   width: "505px",
@@ -15,6 +16,25 @@ const canvas = {
   borderColor: "#e4e4e7",
   borderRadius: 0,
 };
+
+const originalOpenAiApiKey = config.openAiApiKey;
+
+afterEach(() => {
+  config.openAiApiKey = originalOpenAiApiKey;
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+function responseWithLayout() {
+  return new Response(JSON.stringify({
+    id: "resp_layout",
+    status: "completed",
+    output: [{
+      type: "message",
+      content: [{ type: "output_text", text: JSON.stringify({ blocks: [] }) }],
+    }],
+  }), { status: 200 });
+}
 
 describe("normalizeAiLayout", () => {
   it("creates editable, in-bounds blocks with server-generated IDs", () => {
@@ -59,6 +79,32 @@ describe("normalizeAiLayout", () => {
     });
   });
 
+  it("applies only safe AI canvas colors while preserving the configured dimensions and overlays", () => {
+    const result = normalizeAiLayout(canvas, {
+      canvas: {
+        backgroundColor: "#123456",
+        textColor: "#fefefe",
+        borderWidth: 3,
+        borderColor: "#fedcba",
+        borderRadius: 18,
+        width: "999px",
+        overlayImage: "https://untrusted.example/image.png",
+      },
+      blocks: [],
+    });
+
+    expect(result.canvas).toMatchObject({
+      width: canvas.width,
+      height: canvas.height,
+      overlayImage: canvas.overlayImage,
+      backgroundColor: "#123456",
+      textColor: "#fefefe",
+      borderWidth: 3,
+      borderColor: "#fedcba",
+      borderRadius: 18,
+    });
+  });
+
   it("rejects unsupported block types and unbounded payloads", () => {
     expect(() => normalizeAiLayout(canvas, { blocks: [{ type: "script" }] })).toThrow(
       "unsupported block type"
@@ -66,6 +112,26 @@ describe("normalizeAiLayout", () => {
     expect(() => normalizeAiLayout(canvas, { blocks: Array.from({ length: 26 }, () => ({ type: "text" })) })).toThrow(
       "25 blocks"
     );
+    expect(() => normalizeAiLayout(canvas, { blocks: Array.from({ length: 4 }, () => ({ type: "image" })) })).toThrow(
+      "3 image blocks"
+    );
+  });
+
+  it("allows up to 25 blocks when the layout has no image blocks", () => {
+    const result = normalizeAiLayout(canvas, {
+      blocks: Array.from({ length: 25 }, () => ({ type: "text" })),
+    });
+
+    expect(result.blocks).toHaveLength(25);
+  });
+
+  it("limits layouts containing an image block to five blocks", () => {
+    expect(() => normalizeAiLayout(canvas, {
+      blocks: [
+        { type: "image" },
+        ...Array.from({ length: 5 }, () => ({ type: "text" })),
+      ],
+    })).toThrow("5 blocks when image blocks are used");
   });
 });
 
@@ -97,5 +163,24 @@ describe("OpenAI rate-limit and schema safeguards", () => {
     const style = AI_LAYOUT_RESPONSE_SCHEMA.properties.blocks.items.properties.style;
     expect(style.additionalProperties).toBe(false);
     expect(style.required).toContain("fontSize");
+    expect(AI_LAYOUT_RESPONSE_SCHEMA.properties.blocks.maxItems).toBe(25);
+  });
+});
+
+describe("createAiLayout", () => {
+  it("uses the unified trusted prompt with the original request last", async () => {
+    config.openAiApiKey = "test-key";
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [{ flagged: false }] }), { status: 200 }))
+      .mockResolvedValueOnce(responseWithLayout());
+    vi.stubGlobal("fetch", fetch);
+
+    await createAiLayout("Keep every decorative detail", canvas);
+
+    const request = JSON.parse(fetch.mock.calls[1][1].body as string);
+    expect(request.input).toHaveLength(2);
+    expect(request.input[0].content).toContain("[SYSTEM PRE-PROMPT]\nYou are a designer.");
+    expect(request.input[0].content).not.toContain("Keep every decorative detail");
+    expect(request.input[1]).toEqual({ role: "user", content: "[USER REQUEST]\nKeep every decorative detail" });
   });
 });

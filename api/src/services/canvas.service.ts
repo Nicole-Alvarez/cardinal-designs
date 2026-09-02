@@ -165,6 +165,38 @@ export async function update(
   }
 }
 
+export async function setGeneratedImageSource(
+  canvasId: string,
+  templateId: string,
+  userId: string,
+  blockId: string,
+  src: string,
+): Promise<CanvasFull> {
+  await verifyTemplateOwnership(templateId, userId);
+  const canvas = await prisma.canvas.findFirst({ where: { id: canvasId, templateId }, select: canvasFullColumns });
+  if (!canvas) throw new CanvasError("Canvas not found", 404);
+  const content = canvas.content && typeof canvas.content === "object" && !Array.isArray(canvas.content)
+    ? canvas.content as { blocks?: unknown[] }
+    : null;
+  if (!content || !Array.isArray(content.blocks)) throw new CanvasError("Canvas content is invalid", 409);
+  let found = false;
+  const blocks = content.blocks.map((block) => {
+    if (!block || typeof block !== "object" || Array.isArray(block)) return block;
+    const value = block as Record<string, unknown>;
+    if (value.id !== blockId) return block;
+    found = true;
+    if (value.type !== "image") throw new CanvasError("Block is not an image", 400);
+    if (typeof value.src === "string" && value.src) throw new CanvasError("Image block already has an asset", 409);
+    return { ...value, src };
+  });
+  if (!found) throw new CanvasError("Image block not found", 404);
+  return prisma.canvas.update({
+    where: { id: canvasId, templateId },
+    data: { content: { ...(canvas.content as Prisma.JsonObject), blocks } as Prisma.InputJsonValue },
+    select: canvasFullColumns,
+  });
+}
+
 export async function remove(
   canvasId: string,
   templateId: string,

@@ -8,7 +8,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock("@/lib/api", () => api);
 
-import { uploadBlockImage } from "./queries";
+import { createAiLayout, uploadBlockImage } from "./queries";
+import { DEFAULT_CANVAS } from "./types";
 
 describe("template image uploads", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -32,5 +33,20 @@ describe("template image uploads", () => {
     await expect(uploadBlockImage(file)).rejects.toThrow(
       "Upload did not return a portable image URL"
     );
+  });
+});
+
+describe("AI layout requests", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sends the prompt and canvas without a generation mode", async () => {
+    api.apiFetch.mockResolvedValue({ content: { version: 4, canvas: DEFAULT_CANVAS, metadata: [], blocks: [] } });
+
+    await createAiLayout("A gold card", DEFAULT_CANVAS);
+
+    expect(JSON.parse(api.apiFetch.mock.calls[0][1].body)).toMatchObject({
+      prompt: "A gold card",
+      canvas: DEFAULT_CANVAS,
+    });
   });
 });

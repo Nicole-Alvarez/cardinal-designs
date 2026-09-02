@@ -1,18 +1,32 @@
 import { config } from "../config";
+import {
+  buildAiGenerationSystemPrompt,
+  formatAiUserRequest,
+  MAX_AI_BLOCKS_WITH_IMAGES,
+  MAX_AI_BLOCKS_WITHOUT_IMAGES,
+  MAX_AI_IMAGE_BLOCKS,
+} from "./ai-prompt-builder";
 import type { ReferenceImage } from "./reference-image.service";
 
 const MAX_PROMPT_LENGTH = 2_000;
-const MAX_BLOCKS = 25;
 const MIN_BLOCK_SIZE = 16;
 const DEFAULT_ICON = "star";
 
 export const AI_CREATE_LIMITS = {
   maxPromptLength: MAX_PROMPT_LENGTH,
-  maxBlocks: MAX_BLOCKS,
+  maxBlocksWithoutImages: MAX_AI_BLOCKS_WITHOUT_IMAGES,
+  maxBlocksWithImages: MAX_AI_BLOCKS_WITH_IMAGES,
+  maxImageBlocks: MAX_AI_IMAGE_BLOCKS,
 } as const;
 
+export interface ProviderErrorDescriptor {
+  status: number;
+  type?: string;
+  code?: string;
+}
+
 export class AiTemplateError extends Error {
-  constructor(message: string, public statusCode = 400) {
+  constructor(message: string, public statusCode = 400, public provider?: ProviderErrorDescriptor) {
     super(message);
   }
 }
@@ -145,7 +159,9 @@ function rawBlocks(raw: unknown): RawObject[] {
     throw new AiTemplateError("AI response did not contain blocks", 502);
   }
   const blocks = (raw as RawObject).blocks as unknown[];
-  if (blocks.length > MAX_BLOCKS) throw new AiTemplateError(`AI layouts may contain at most ${MAX_BLOCKS} blocks`, 502);
+  if (blocks.length > MAX_AI_BLOCKS_WITHOUT_IMAGES) {
+    throw new AiTemplateError(`AI layouts without image blocks may contain at most ${MAX_AI_BLOCKS_WITHOUT_IMAGES} blocks`, 502);
+  }
   return blocks.map((block) => {
     if (!block || typeof block !== "object" || Array.isArray(block)) {
       throw new AiTemplateError("AI response contains an invalid block", 502);
@@ -154,15 +170,35 @@ function rawBlocks(raw: unknown): RawObject[] {
   });
 }
 
+function normalizeCanvasTheme(canvas: AiCanvasInput, raw: unknown): AiCanvasInput {
+  const value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as RawObject : {};
+  return {
+    ...canvas,
+    backgroundColor: isSafeColor(value.backgroundColor, canvas.backgroundColor),
+    textColor: isSafeColor(value.textColor, canvas.textColor),
+    borderWidth: integerInRange(value.borderWidth, canvas.borderWidth, 0, 16),
+    borderColor: isSafeColor(value.borderColor, canvas.borderColor),
+    borderRadius: integerInRange(value.borderRadius, canvas.borderRadius, 0, 128),
+  };
+}
+
 /** Converts untrusted model JSON into the editor's editable v4 content model. */
 export function normalizeAiLayout(canvas: AiCanvasInput, raw: unknown): AiTemplateContent {
   const width = canvasDimension(canvas.width, 480);
   const height = canvasDimension(canvas.height, 384);
-  const blocks = rawBlocks(raw).map((source, index) => {
+  const sourceBlocks = rawBlocks(raw);
+  if (sourceBlocks.some((block) => block.type === "image") && sourceBlocks.length > MAX_AI_BLOCKS_WITH_IMAGES) {
+    throw new AiTemplateError(`AI layouts with image blocks may contain at most ${MAX_AI_BLOCKS_WITH_IMAGES} blocks when image blocks are used`, 502);
+  }
+  let imageBlocks = 0;
+  const blocks = sourceBlocks.map((source, index) => {
     if (!BLOCK_TYPES.has(source.type as AiTemplateBlock["type"])) {
       throw new AiTemplateError("AI response contains an unsupported block type", 502);
     }
     const type = source.type as AiTemplateBlock["type"];
+    if (type === "image" && ++imageBlocks > MAX_AI_IMAGE_BLOCKS) {
+      throw new AiTemplateError(`AI layouts may contain at most ${MAX_AI_IMAGE_BLOCKS} image blocks`, 502);
+    }
     const blockWidth = integerInRange(source.width, type === "icon" || type === "qr" ? 120 : 200, MIN_BLOCK_SIZE, width);
     const blockHeight = type === "icon" || type === "qr"
       ? blockWidth
@@ -191,7 +227,8 @@ export function normalizeAiLayout(canvas: AiCanvasInput, raw: unknown): AiTempla
     return block;
   });
 
-  return { version: 4, canvas, blocks, metadata: [] };
+  const rawTheme = raw && typeof raw === "object" ? (raw as RawObject).canvas : undefined;
+  return { version: 4, canvas: normalizeCanvasTheme(canvas, rawTheme), blocks, metadata: [] };
 }
 
 function requireOpenAiKey(): string {
@@ -232,15 +269,17 @@ async function openAiJson(path: string, body: unknown): Promise<unknown> {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    console.error("OpenAI AI Create request failed", openAiErrorDetails(path, response, data));
+    const details = openAiErrorDetails(path, response, data);
+    console.error("OpenAI AI Create request failed", details);
     if (response.status === 429) {
       const retryAfter = retryAfterSeconds(response);
       throw new AiTemplateError(
         retryAfter ? `OpenAI is rate limited. Try again in ${retryAfter} seconds.` : "OpenAI is rate limited. Try again shortly.",
-        429
+        429,
+        details,
       );
     }
-    throw new AiTemplateError("AI Create is temporarily unavailable", 502);
+    throw new AiTemplateError("AI Create is temporarily unavailable", 502, details);
   }
   return data;
 }
@@ -248,11 +287,23 @@ async function openAiJson(path: string, body: unknown): Promise<unknown> {
 export const AI_LAYOUT_RESPONSE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["blocks"],
+  required: ["canvas", "blocks"],
   properties: {
+    canvas: {
+      type: "object",
+      additionalProperties: false,
+      required: ["backgroundColor", "textColor", "borderWidth", "borderColor", "borderRadius"],
+      properties: {
+        backgroundColor: { type: "string" },
+        textColor: { type: "string" },
+        borderWidth: { type: "number" },
+        borderColor: { type: "string" },
+        borderRadius: { type: "number" },
+      },
+    },
     blocks: {
       type: "array",
-      maxItems: MAX_BLOCKS,
+      maxItems: MAX_AI_BLOCKS_WITHOUT_IMAGES,
       items: {
         type: "object",
         additionalProperties: false,
@@ -309,39 +360,77 @@ export async function createAiReferenceLayout(
   const response = await openAiJson("/responses", {
     model: "gpt-5.4-mini",
     store: false,
-    input: [{ role: "user", content: [
-      { type: "input_text", text: `Reconstruct this reference as editable card blocks for a ${trustedCanvas.width} by ${trustedCanvas.height} canvas. ${matchClosely ? "Match layout and hierarchy as closely as supported." : "Use the reference as visual inspiration."} Text must be separate editable text blocks. Use empty image blocks with alt text for photos/logos that cannot be recreated natively. ${prompt.trim()}` },
+    input: [
+      { role: "system", content: `Reconstruct the supplied card reference as an editable, flat 2D canvas layout. Return only the schema output. Layouts without image blocks may use at most ${MAX_AI_BLOCKS_WITHOUT_IMAGES} blocks. Layouts with image blocks may use at most ${MAX_AI_BLOCKS_WITH_IMAGES} blocks and at most ${MAX_AI_IMAGE_BLOCKS} empty image placeholders. Never use image URLs, overlays, or non-editable raster artwork. Preserve the supplied canvas dimensions.` },
+      { role: "user", content: [
+      { type: "input_text", text: `${matchClosely ? "Match the reference closely: preserve its dominant background, text, accent, border, and contrast colors; major regions; text hierarchy; alignment; spacing; and layering. Set the canvas theme values from the visible reference." : "Use the reference as visual inspiration while preferring its observed palette, hierarchy, and composition."} Recreate visible flat sections, dividers, badges, and accents with editable native blocks. Use empty image blocks only for photos or logos that cannot be recreated natively. [USER REQUEST]\n${prompt.trim()}` },
       { type: "input_image", image_url: reference.dataUrl, detail: "high" },
-    ] }],
+    ] },
+    ],
     text: { format: { type: "json_schema", name: "card_layout", strict: true, schema: AI_LAYOUT_RESPONSE_SCHEMA } },
-  }) as { output_text?: unknown };
-  if (typeof response.output_text !== "string") throw new AiTemplateError("AI Create returned no layout", 502);
-  try { return normalizeAiLayout(trustedCanvas, JSON.parse(response.output_text)); }
-  catch (error) { if (error instanceof AiTemplateError) throw error; throw new AiTemplateError("AI Create returned an invalid layout", 502); }
+  });
+  return parseAiLayoutResponse(trustedCanvas, response);
 }
 
-export async function createAiLayout(prompt: unknown, canvas: unknown): Promise<AiTemplateContent> {
-  if (typeof prompt !== "string" || !prompt.trim()) throw new AiTemplateError("Describe the card you want to create");
-  if (prompt.length > MAX_PROMPT_LENGTH) throw new AiTemplateError(`Prompt must be ${MAX_PROMPT_LENGTH} characters or fewer`);
+export async function createAiLayout(originalPrompt: unknown, canvas: unknown): Promise<AiTemplateContent> {
+  if (typeof originalPrompt !== "string" || !originalPrompt.trim()) throw new AiTemplateError("Describe the card you want to create");
+  if (originalPrompt.length > MAX_PROMPT_LENGTH) throw new AiTemplateError(`Prompt must be ${MAX_PROMPT_LENGTH} characters or fewer`);
   if (!canvas || typeof canvas !== "object") throw new AiTemplateError("A canvas is required");
 
   const trustedCanvas = canvas as AiCanvasInput;
-  await moderate(prompt.trim());
+  await moderate(originalPrompt.trim());
   const response = await openAiJson("/responses", {
     model: "gpt-5.4-mini",
     input: [
-      {
-        role: "system",
-        content: "Create an editable card layout. Return only blocks supported by the schema. Keep all blocks within the supplied canvas. Do not use images URLs; use image blocks with descriptive alt text when imagery is requested. Use concise, editable text.",
-      },
-      { role: "user", content: `Canvas: ${trustedCanvas.width} by ${trustedCanvas.height}. Request: ${prompt.trim()}` },
+      { role: "system", content: buildAiGenerationSystemPrompt(trustedCanvas) },
+      { role: "user", content: formatAiUserRequest(originalPrompt.trim()) },
     ],
     text: { format: { type: "json_schema", name: "card_layout", strict: true, schema: AI_LAYOUT_RESPONSE_SCHEMA } },
-  }) as { output_text?: unknown };
+  });
+  return parseAiLayoutResponse(trustedCanvas, response);
+}
 
-  if (typeof response.output_text !== "string") throw new AiTemplateError("AI Create returned no layout", 502);
+type AiResponsesPayload = {
+  id?: unknown;
+  status?: unknown;
+  incomplete_details?: { reason?: unknown };
+  error?: { code?: unknown; message?: unknown };
+  output?: Array<{ type?: unknown; content?: Array<{ type?: unknown; text?: unknown; refusal?: unknown }> }>;
+};
+
+function responseOutputText(response: AiResponsesPayload): string | null {
+  for (const item of response.output ?? []) {
+    for (const content of item.content ?? []) {
+      if (content.type === "output_text" && typeof content.text === "string") return content.text;
+    }
+  }
+  return null;
+}
+
+function responseFailureMessage(response: AiResponsesPayload): string {
+  const status = typeof response.status === "string" ? response.status : "unknown";
+  const reason = typeof response.incomplete_details?.reason === "string" ? response.incomplete_details.reason : undefined;
+  const refusal = response.output?.flatMap((item) => item.content ?? []).some((content) => typeof content.refusal === "string");
+  console.error("OpenAI AI Create returned no layout", {
+    responseId: typeof response.id === "string" ? response.id : undefined,
+    status,
+    incompleteReason: reason,
+    errorCode: typeof response.error?.code === "string" ? response.error.code : undefined,
+    errorMessage: typeof response.error?.message === "string" ? response.error.message : undefined,
+    outputTypes: response.output?.map((item) => typeof item.type === "string" ? item.type : "unknown"),
+  });
+  if (refusal) return "AI Create was refused";
+  if (status === "incomplete") return reason ? `AI Create did not complete: ${reason}` : "AI Create did not complete";
+  if (status === "failed" || status === "cancelled") return `AI Create did not complete: ${status}`;
+  return "AI Create returned no layout";
+}
+
+function parseAiLayoutResponse(canvas: AiCanvasInput, response: unknown): AiTemplateContent {
+  const payload = response && typeof response === "object" ? response as AiResponsesPayload : {};
+  const outputText = responseOutputText(payload);
+  if (outputText === null) throw new AiTemplateError(responseFailureMessage(payload), 502);
   try {
-    return normalizeAiLayout(trustedCanvas, JSON.parse(response.output_text));
+    return normalizeAiLayout(canvas, JSON.parse(outputText));
   } catch (error) {
     if (error instanceof AiTemplateError) throw error;
     throw new AiTemplateError("AI Create returned an invalid layout", 502);

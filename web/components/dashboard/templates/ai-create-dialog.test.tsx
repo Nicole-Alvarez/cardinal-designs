@@ -51,4 +51,21 @@ describe("AiCreateDialog", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("PNG, JPEG, or WebP");
     expect(queries.createAiReferenceLayout).not.toHaveBeenCalled();
   });
+
+  it("preserves the visible prompt while generation is in progress", async () => {
+    let finish!: (value: unknown) => void;
+    queries.createAiLayout.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const user = userEvent.setup();
+    render(<AiCreateDialog open canvas={DEFAULT_CANVAS} onClose={vi.fn()} onApply={vi.fn()} />);
+
+    const prompt = screen.getByLabelText("Describe the card you want to create");
+    await user.type(prompt, "Gold member card");
+    expect(prompt).toHaveValue("Gold member card");
+
+    await user.click(screen.getByRole("button", { name: "Generate layout" }));
+    expect(queries.createAiLayout).toHaveBeenCalledWith("Gold member card", DEFAULT_CANVAS);
+    expect(prompt).toHaveValue("Gold member card");
+    expect(screen.queryByRole("button", { name: "Low generation mode" })).not.toBeInTheDocument();
+    finish({ version: 4, canvas: DEFAULT_CANVAS, metadata: [], blocks: [] });
+  });
 });

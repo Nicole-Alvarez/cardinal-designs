@@ -19,6 +19,7 @@ import MobileEditorActions, {
 } from "@/components/dashboard/templates/mobile-editor-actions";
 import PreviewDialog from "@/components/dashboard/templates/preview-dialog";
 import AiCreateDialog from "@/components/dashboard/templates/ai-create-dialog";
+import AiImageDialog from "@/components/dashboard/templates/ai-image-dialog";
 import TemplateZipExportDialog from "@/components/dashboard/templates/template-zip-export-dialog";
 import CanvasSelector from "@/components/dashboard/templates/canvas-selector";
 import SettingsDialog from "@/components/dashboard/templates/settings-dialog";
@@ -50,7 +51,7 @@ import {
   type TemplateCanvas,
   type TemplateMetadata,
 } from "../types";
-import { createTemplate, getTemplate, updateTemplate } from "../queries";
+import { createTemplate, generateAiImageBlock, getTemplate, updateTemplate } from "../queries";
 import {
   listCanvases,
   getCanvas,
@@ -78,6 +79,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
+  const [aiImageOpen, setAiImageOpen] = useState(false);
   const [zipExportOpen, setZipExportOpen] = useState(false);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -98,6 +100,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [deleteCanvasOpen, setDeleteCanvasOpen] = useState(false);
   const [deleteCanvasTarget, setDeleteCanvasTarget] = useState<string | null>(null);
   const [creatingCanvas, setCreatingCanvas] = useState(false);
+  const [aiImageStatus, setAiImageStatus] = useState<Record<string, "pending" | "generating" | "uploading" | "completed" | "failed">>({});
+  const [aiImageErrors, setAiImageErrors] = useState<Record<string, string>>({});
   const history = useTemplateHistory();
   const codeHistory = useCodeHistory();
 
@@ -567,6 +571,29 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     markDirty();
   }
 
+  async function handleGenerateAiImage(prompt: string) {
+    if (!selectedBlock || selectedBlock.type !== "image") return;
+    if (isDraft || !activeCanvasId) {
+      throw new Error("Save the template before generating AI images.");
+    }
+    if (dirty) {
+      throw new Error("Save your layout changes before generating this image.");
+    }
+    setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "generating" }));
+    setAiImageErrors((prev) => { const next = { ...prev }; delete next[selectedBlock.id]; return next; });
+    try {
+      const src = await generateAiImageBlock(templateId, activeCanvasId, selectedBlock.id, prompt);
+      setBlocks((prev) => prev.map((block) => block.id === selectedBlock.id ? { ...block, src } : block));
+      setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "completed" }));
+      markDirty();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "AI image generation failed";
+      setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "failed" }));
+      setAiImageErrors((prev) => ({ ...prev, [selectedBlock.id]: message }));
+      throw new Error(message);
+    }
+  }
+
   async function handleConvertToWysiwyg() {
     setError(null);
     try {
@@ -859,6 +886,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                     onChange={patchSelected}
                     onStyleChange={patchSelectedStyle}
                     onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
+                    onGenerateAiImage={() => setAiImageOpen(true)}
+                    aiImageStatus={selectedBlock ? aiImageStatus[selectedBlock.id] : undefined}
+                    aiImageError={selectedBlock ? aiImageErrors[selectedBlock.id] : null}
                   />
                 )}
               </div>
@@ -905,6 +935,9 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               onChange={patchSelected}
               onStyleChange={patchSelectedStyle}
               onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
+              onGenerateAiImage={() => setAiImageOpen(true)}
+              aiImageStatus={selectedBlock ? aiImageStatus[selectedBlock.id] : undefined}
+              aiImageError={selectedBlock ? aiImageErrors[selectedBlock.id] : null}
             />
           ) : (
             <CanvasPanel canvas={canvas} onChange={patchCanvas} />
@@ -930,10 +963,17 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
       />
 
       <AiCreateDialog
+        key={aiCreateOpen ? "ai-create-open" : "ai-create-closed"}
         open={aiCreateOpen}
         canvas={canvas}
         onClose={() => setAiCreateOpen(false)}
         onApply={applyAiLayout}
+      />
+
+      <AiImageDialog
+        open={aiImageOpen}
+        onClose={() => setAiImageOpen(false)}
+        onGenerate={handleGenerateAiImage}
       />
 
       <TemplateZipExportDialog

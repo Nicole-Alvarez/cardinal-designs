@@ -75,6 +75,18 @@ export async function createAiReferenceLayout(prompt: string, canvas: TemplateCa
   return data.content;
 }
 
+export async function generateAiImageBlock(templateId: string, canvasId: string, blockId: string, prompt: string): Promise<string> {
+  const data = await apiFetch(`/api/templates/${templateId}/canvases/${canvasId}/ai-images/${blockId}`, {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify({ prompt }),
+  });
+  if (typeof data.url !== "string" || new URL(data.url).protocol !== "https:") {
+    throw new Error("AI image generation did not return a portable image URL");
+  }
+  return data.url;
+}
+
 /** Uploads an image and returns its permanent public serving URL. */
 export async function uploadBlockImage(file: File): Promise<string> {
   const data = await apiUpload<{ pathname: string; url: string }>("/api/uploads", file);
