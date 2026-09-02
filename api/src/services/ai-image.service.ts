@@ -49,13 +49,19 @@ export async function generateImageBlockAsset(block: AiTemplateBlock, prompt: un
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    console.error("OpenAI image generation failed", { status: response.status, requestId: response.headers.get("x-request-id") ?? undefined });
+    console.error("OpenAI image generation failed", { stage: "openai", status: response.status, requestId: response.headers.get("x-request-id") ?? undefined, type: data && typeof data === "object" && "error" in data ? (data as { error?: { type?: unknown } }).error?.type : undefined, code: data && typeof data === "object" && "error" in data ? (data as { error?: { code?: unknown } }).error?.code : undefined });
     throw new AiTemplateError(response.status === 429 ? "OpenAI image generation is rate limited. Try again shortly." : "AI image generation is temporarily unavailable", response.status === 429 ? 429 : 502);
   }
   try {
-    return await putImage(pngBuffer(imageResult(data)), "image/png");
+    const image = pngBuffer(imageResult(data));
+    const uploaded = await putImage(image, "image/png");
+    console.info("OpenAI image generation completed", { stage: "blob-upload", bytes: image.byteLength, pathname: uploaded.pathname });
+    return uploaded;
   } catch (error) {
-    if (error instanceof AiTemplateError || error instanceof UploadsError) throw error;
+    if (error instanceof AiTemplateError || error instanceof UploadsError) {
+      console.error("OpenAI image generation failed", { stage: error instanceof UploadsError ? "blob-upload" : "image-result", message: error.message });
+      throw error;
+    }
     throw new AiTemplateError("AI image generation could not save the image", 502);
   }
 }

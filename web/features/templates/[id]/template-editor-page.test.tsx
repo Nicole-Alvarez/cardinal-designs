@@ -8,6 +8,7 @@ const queries = vi.hoisted(() => ({
   getTemplate: vi.fn(),
   updateTemplate: vi.fn(),
   createTemplate: vi.fn(),
+  getCurrentUserConfiguration: vi.fn(),
 }));
 const canvasQueries = vi.hoisted(() => ({
   listCanvases: vi.fn(),
@@ -56,6 +57,7 @@ import TemplateEditorPage from "./template-editor-page";
 describe("TemplateEditorPage panel tabs", () => {
   beforeEach(() => {
     queries.getTemplate.mockReset();
+    queries.getCurrentUserConfiguration.mockReset().mockResolvedValue({ canUseGenerateAI: true, metadataEnabled: true, canDownloadAssets: true });
     canvasQueries.listCanvases.mockReset().mockResolvedValue([]);
   });
 

@@ -80,6 +80,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [aiImageOpen, setAiImageOpen] = useState(false);
+  const [aiImageBlockId, setAiImageBlockId] = useState<string | null>(null);
   const [zipExportOpen, setZipExportOpen] = useState(false);
   const [userConfiguration, setUserConfiguration] = useState<{ canUseGenerateAI: boolean; metadataEnabled: boolean; canDownloadAssets: boolean } | null>(null);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
@@ -575,24 +576,25 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   }
 
   async function handleGenerateAiImage(prompt: string) {
-    if (!selectedBlock || selectedBlock.type !== "image") return;
+    const imageBlock = blocks.find((block) => block.id === aiImageBlockId);
+    if (!imageBlock || imageBlock.type !== "image") {
+      throw new Error("Select an empty Image block before generating an asset.");
+    }
     if (isDraft || !activeCanvasId) {
       throw new Error("Save the template before generating AI images.");
     }
-    if (dirty) {
-      throw new Error("Save your layout changes before generating this image.");
-    }
-    setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "generating" }));
-    setAiImageErrors((prev) => { const next = { ...prev }; delete next[selectedBlock.id]; return next; });
+    if (dirty) await handleSave();
+    setAiImageStatus((prev) => ({ ...prev, [imageBlock.id]: "generating" }));
+    setAiImageErrors((prev) => { const next = { ...prev }; delete next[imageBlock.id]; return next; });
     try {
-      const src = await generateAiImageBlock(templateId, activeCanvasId, selectedBlock.id, prompt);
-      setBlocks((prev) => prev.map((block) => block.id === selectedBlock.id ? { ...block, src } : block));
-      setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "completed" }));
+      const src = await generateAiImageBlock(templateId, activeCanvasId, imageBlock.id, prompt);
+      setBlocks((prev) => prev.map((block) => block.id === imageBlock.id ? { ...block, src } : block));
+      setAiImageStatus((prev) => ({ ...prev, [imageBlock.id]: "completed" }));
       markDirty();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "AI image generation failed";
-      setAiImageStatus((prev) => ({ ...prev, [selectedBlock.id]: "failed" }));
-      setAiImageErrors((prev) => ({ ...prev, [selectedBlock.id]: message }));
+      setAiImageStatus((prev) => ({ ...prev, [imageBlock.id]: "failed" }));
+      setAiImageErrors((prev) => ({ ...prev, [imageBlock.id]: message }));
       throw new Error(message);
     }
   }
@@ -892,9 +894,10 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
                     onChange={patchSelected}
                     onStyleChange={patchSelectedStyle}
                     onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
-                    onGenerateAiImage={() => setAiImageOpen(true)}
+                    onGenerateAiImage={() => { if (selectedBlock) { setAiImageBlockId(selectedBlock.id); setAiImageOpen(true); } }}
                     aiImageStatus={selectedBlock ? aiImageStatus[selectedBlock.id] : undefined}
                     aiImageError={selectedBlock ? aiImageErrors[selectedBlock.id] : null}
+                    canUseGenerateAI={userConfiguration?.canUseGenerateAI ?? false}
                   />
                 )}
               </div>
@@ -941,9 +944,10 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
               onChange={patchSelected}
               onStyleChange={patchSelectedStyle}
               onStack={(dir) => selectedBlock && stackBlock(selectedBlock.id, dir)}
-              onGenerateAiImage={() => setAiImageOpen(true)}
+              onGenerateAiImage={() => { if (selectedBlock) { setAiImageBlockId(selectedBlock.id); setAiImageOpen(true); } }}
               aiImageStatus={selectedBlock ? aiImageStatus[selectedBlock.id] : undefined}
               aiImageError={selectedBlock ? aiImageErrors[selectedBlock.id] : null}
+              canUseGenerateAI={userConfiguration?.canUseGenerateAI ?? false}
             />
           ) : (
             <CanvasPanel canvas={canvas} onChange={patchCanvas} />
@@ -978,7 +982,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
       <AiImageDialog
         open={aiImageOpen}
-        onClose={() => setAiImageOpen(false)}
+        onClose={() => { setAiImageOpen(false); setAiImageBlockId(null); }}
         onGenerate={handleGenerateAiImage}
       />
 

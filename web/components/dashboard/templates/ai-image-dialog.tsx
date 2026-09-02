@@ -26,7 +26,7 @@ export default function AiImageDialog({
     finally { setLoading(false); }
   }
 
-  return <AccessibleDialog open={open} onClose={() => { if (!loading) onClose(); }} labelledBy="ai-image-title" initialFocusRef={inputRef} panelClassName="w-full max-w-lg rounded-2xl bg-surface-1 p-5 text-text-primary shadow-2xl">
+  return <AccessibleDialog open={open} onClose={() => { if (!loading) onClose(); }} labelledBy="ai-image-title" initialFocusRef={inputRef} panelClassName="w-full max-w-lg rounded-2xl bg-surface-1 p-5 text-text-primary shadow-2xl"><div data-template-selection-preserving>
     <div className="flex items-start justify-between gap-3">
       <div><h2 id="ai-image-title" className="text-lg font-semibold">Generate image with AI</h2><p className="mt-1 text-sm text-text-secondary">Describe the image asset. Alt text remains separate accessibility content.</p></div>
       <button type="button" aria-label="Close AI image generation" disabled={loading} onClick={onClose} className="rounded-md p-2 hover:bg-surface-2">×</button>
@@ -35,5 +35,5 @@ export default function AiImageDialog({
     <textarea ref={inputRef} id="ai-image-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={500} rows={4} placeholder="Minimal gold single-line goat-head emblem, transparent background, no text." className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-0 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus" />
     {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}
     <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" disabled={loading} onClick={onClose}>Cancel</Button><Button disabled={loading} onClick={() => void submit()}>{loading ? "Generating…" : "Generate image"}</Button></div>
-  </AccessibleDialog>;
+  </div></AccessibleDialog>;
 }
