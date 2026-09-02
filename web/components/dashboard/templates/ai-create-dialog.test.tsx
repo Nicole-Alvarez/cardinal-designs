@@ -21,7 +21,7 @@ describe("AiCreateDialog", () => {
     expect(prompt).toHaveValue("A member card");
   });
 
-  it("keeps generated content temporary until the user applies it", async () => {
+  it("applies generated content immediately after generation", async () => {
     queries.createAiLayout.mockResolvedValue({
       version: 4,
       canvas: DEFAULT_CANVAS,
@@ -35,11 +35,8 @@ describe("AiCreateDialog", () => {
     await user.type(screen.getByLabelText("Describe the card you want to create"), "A welcome card");
     await user.click(screen.getByRole("button", { name: "Generate layout" }));
 
-    expect(await screen.findByText("1 editable block generated")).toBeInTheDocument();
-    expect(screen.getByLabelText("Preview generated layout")).toBeInTheDocument();
-    expect(onApply).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Apply layout" }));
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ blocks: expect.arrayContaining([expect.objectContaining({ text: "Welcome" })]) }));
+    expect(screen.queryByRole("button", { name: "Apply layout" })).not.toBeInTheDocument();
   });
 
   it("rejects unsupported reference files before creating an AI request", async () => {

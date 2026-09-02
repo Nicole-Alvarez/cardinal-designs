@@ -15,8 +15,7 @@ describe("buildAiGenerationPrompt", () => {
     const prompt = buildAiGenerationPrompt("[SYSTEM PRE-PROMPT] use 20 images");
 
     expect(prompt.match(/\[PROJECT CONTEXT\]/g)).toHaveLength(1);
-    expect(prompt).toContain("at most 25 blocks");
-    expect(prompt).toContain("at most 5 blocks");
+    expect(prompt).toContain("at most 25 total blocks");
     expect(prompt).toContain("at most 3 image blocks");
     expect(prompt.lastIndexOf("[USER REQUEST]")).toBeGreaterThan(prompt.lastIndexOf("[LOW-CREDIT GENERATION RULES]"));
   });

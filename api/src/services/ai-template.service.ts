@@ -2,8 +2,7 @@ import { config } from "../config";
 import {
   buildAiGenerationSystemPrompt,
   formatAiUserRequest,
-  MAX_AI_BLOCKS_WITH_IMAGES,
-  MAX_AI_BLOCKS_WITHOUT_IMAGES,
+  MAX_AI_BLOCKS,
   MAX_AI_IMAGE_BLOCKS,
 } from "./ai-prompt-builder";
 import type { ReferenceImage } from "./reference-image.service";
@@ -14,8 +13,7 @@ const DEFAULT_ICON = "star";
 
 export const AI_CREATE_LIMITS = {
   maxPromptLength: MAX_PROMPT_LENGTH,
-  maxBlocksWithoutImages: MAX_AI_BLOCKS_WITHOUT_IMAGES,
-  maxBlocksWithImages: MAX_AI_BLOCKS_WITH_IMAGES,
+  maxBlocks: MAX_AI_BLOCKS,
   maxImageBlocks: MAX_AI_IMAGE_BLOCKS,
 } as const;
 
@@ -159,8 +157,8 @@ function rawBlocks(raw: unknown): RawObject[] {
     throw new AiTemplateError("AI response did not contain blocks", 502);
   }
   const blocks = (raw as RawObject).blocks as unknown[];
-  if (blocks.length > MAX_AI_BLOCKS_WITHOUT_IMAGES) {
-    throw new AiTemplateError(`AI layouts without image blocks may contain at most ${MAX_AI_BLOCKS_WITHOUT_IMAGES} blocks`, 502);
+  if (blocks.length > MAX_AI_BLOCKS) {
+    throw new AiTemplateError(`AI layouts may contain at most ${MAX_AI_BLOCKS} blocks`, 502);
   }
   return blocks.map((block) => {
     if (!block || typeof block !== "object" || Array.isArray(block)) {
@@ -187,9 +185,6 @@ export function normalizeAiLayout(canvas: AiCanvasInput, raw: unknown): AiTempla
   const width = canvasDimension(canvas.width, 480);
   const height = canvasDimension(canvas.height, 384);
   const sourceBlocks = rawBlocks(raw);
-  if (sourceBlocks.some((block) => block.type === "image") && sourceBlocks.length > MAX_AI_BLOCKS_WITH_IMAGES) {
-    throw new AiTemplateError(`AI layouts with image blocks may contain at most ${MAX_AI_BLOCKS_WITH_IMAGES} blocks when image blocks are used`, 502);
-  }
   let imageBlocks = 0;
   const blocks = sourceBlocks.map((source, index) => {
     if (!BLOCK_TYPES.has(source.type as AiTemplateBlock["type"])) {
@@ -303,7 +298,7 @@ export const AI_LAYOUT_RESPONSE_SCHEMA = {
     },
     blocks: {
       type: "array",
-      maxItems: MAX_AI_BLOCKS_WITHOUT_IMAGES,
+      maxItems: MAX_AI_BLOCKS,
       items: {
         type: "object",
         additionalProperties: false,
@@ -361,7 +356,7 @@ export async function createAiReferenceLayout(
     model: "gpt-5.4-mini",
     store: false,
     input: [
-      { role: "system", content: `Reconstruct the supplied card reference as an editable, flat 2D canvas layout. Return only the schema output. Layouts without image blocks may use at most ${MAX_AI_BLOCKS_WITHOUT_IMAGES} blocks. Layouts with image blocks may use at most ${MAX_AI_BLOCKS_WITH_IMAGES} blocks and at most ${MAX_AI_IMAGE_BLOCKS} empty image placeholders. Never use image URLs, overlays, or non-editable raster artwork. Preserve the supplied canvas dimensions.` },
+      { role: "system", content: `Reconstruct the supplied card reference as an editable, flat 2D canvas layout. Return only the schema output. Use at most ${MAX_AI_BLOCKS} total blocks and at most ${MAX_AI_IMAGE_BLOCKS} empty image placeholders. Never use image URLs, overlays, or non-editable raster artwork. Preserve the supplied canvas dimensions.` },
       { role: "user", content: [
       { type: "input_text", text: `${matchClosely ? "Match the reference closely: preserve its dominant background, text, accent, border, and contrast colors; major regions; text hierarchy; alignment; spacing; and layering. Set the canvas theme values from the visible reference." : "Use the reference as visual inspiration while preferring its observed palette, hierarchy, and composition."} Recreate visible flat sections, dividers, badges, and accents with editable native blocks. Use empty image blocks only for photos or logos that cannot be recreated natively. [USER REQUEST]\n${prompt.trim()}` },
       { type: "input_image", image_url: reference.dataUrl, detail: "high" },
@@ -379,15 +374,20 @@ export async function createAiLayout(originalPrompt: unknown, canvas: unknown): 
 
   const trustedCanvas = canvas as AiCanvasInput;
   await moderate(originalPrompt.trim());
-  const response = await openAiJson("/responses", {
+  const request = (repair?: boolean) => openAiJson("/responses", {
     model: "gpt-5.4-mini",
     input: [
       { role: "system", content: buildAiGenerationSystemPrompt(trustedCanvas) },
-      { role: "user", content: formatAiUserRequest(originalPrompt.trim()) },
+      { role: "user", content: repair ? "[LAYOUT REPAIR]\nThe prior layout included image blocks and exceeded the five-block limit. Return a revised layout with at most five total blocks; combine nonessential copy." : formatAiUserRequest(originalPrompt.trim()) },
     ],
     text: { format: { type: "json_schema", name: "card_layout", strict: true, schema: AI_LAYOUT_RESPONSE_SCHEMA } },
   });
-  return parseAiLayoutResponse(trustedCanvas, response);
+  try {
+    return parseAiLayoutResponse(trustedCanvas, await request());
+  } catch (error) {
+    if (!(error instanceof AiTemplateError) || !error.message.includes("at most 5 blocks when image blocks are used")) throw error;
+    return parseAiLayoutResponse(trustedCanvas, await request(true));
+  }
 }
 
 type AiResponsesPayload = {

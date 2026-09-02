@@ -125,13 +125,10 @@ describe("normalizeAiLayout", () => {
     expect(result.blocks).toHaveLength(25);
   });
 
-  it("limits layouts containing an image block to five blocks", () => {
-    expect(() => normalizeAiLayout(canvas, {
-      blocks: [
-        { type: "image" },
-        ...Array.from({ length: 5 }, () => ({ type: "text" })),
-      ],
-    })).toThrow("5 blocks when image blocks are used");
+  it("allows image layouts until the universal 25-block limit", () => {
+    expect(normalizeAiLayout(canvas, {
+      blocks: [{ type: "image" }, ...Array.from({ length: 24 }, () => ({ type: "text" }))],
+    }).blocks).toHaveLength(25);
   });
 });
 

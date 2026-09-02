@@ -81,6 +81,8 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [aiImageOpen, setAiImageOpen] = useState(false);
   const [aiImageBlockId, setAiImageBlockId] = useState<string | null>(null);
+  const [autoImageBlockIds, setAutoImageBlockIds] = useState<string[]>([]);
+  const [autoSaveAiLayout, setAutoSaveAiLayout] = useState(false);
   const [zipExportOpen, setZipExportOpen] = useState(false);
   const [userConfiguration, setUserConfiguration] = useState<{ canUseGenerateAI: boolean; metadataEnabled: boolean; canDownloadAssets: boolean } | null>(null);
   const [mobileAction, setMobileAction] = useState<MobileEditorAction | null>(null);
@@ -491,6 +493,14 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
 
   useEffect(() => { void getCurrentUserConfiguration().then(setUserConfiguration).catch(() => setUserConfiguration({ canUseGenerateAI: false, metadataEnabled: false, canDownloadAssets: false })); }, []);
 
+  useEffect(() => {
+    if (!autoSaveAiLayout || !dirty || saving || loading || !activeCanvasId) return;
+    setAutoSaveAiLayout(false);
+    void handleSave();
+    // handleSave intentionally reads the latest editor snapshot after applyAiLayout has committed it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCanvasId, autoSaveAiLayout, dirty, loading, saving]);
+
   async function handleSave() {
     if (!activeCanvasId) return;
     setSaving(true);
@@ -511,6 +521,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           react: generated.react,
           angular: generated.angular,
         });
+        await generateAutoImages(created.id, canvasId, autoImageBlockIds);
         router.replace(`/dashboard/templates/${created.id}`);
       } else {
         await updateCanvas(templateId, activeCanvasId, {
@@ -525,6 +536,7 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
           isPrivate,
           isCode: mode === "code",
         });
+        await generateAutoImages(templateId, activeCanvasId, autoImageBlockIds);
         setSavedAt(new Date().toLocaleString());
         setDirty(false);
       }
@@ -570,9 +582,29 @@ export default function TemplateEditorPage({ templateId }: { templateId: string 
     checkpoint("ai-create");
     setCanvas(content.canvas);
     setBlocks(content.blocks);
+    setAutoImageBlockIds(content.blocks.filter((block) => block.type === "image" && !block.src).map((block) => block.id));
+    setAutoSaveAiLayout(true);
     setSelectedIds([]);
     setPanelTab("canvas");
     markDirty();
+  }
+
+  async function generateAutoImages(nextTemplateId: string, nextCanvasId: string, ids: string[]) {
+    if (!userConfiguration?.canUseGenerateAI) return;
+    for (const id of ids) {
+      const block = blocks.find((item) => item.id === id);
+      if (!block || block.type !== "image" || block.src) continue;
+      setAiImageStatus((prev) => ({ ...prev, [id]: "generating" }));
+      try {
+        const src = await generateAiImageBlock(nextTemplateId, nextCanvasId, id, block.alt || "Generate an appropriate visual asset for this layout.");
+        setBlocks((prev) => prev.map((item) => item.id === id ? { ...item, src } : item));
+        setAiImageStatus((prev) => ({ ...prev, [id]: "completed" }));
+      } catch (error) {
+        setAiImageStatus((prev) => ({ ...prev, [id]: "failed" }));
+        setAiImageErrors((prev) => ({ ...prev, [id]: error instanceof Error ? error.message : "AI image generation failed" }));
+      }
+    }
+    setAutoImageBlockIds([]);
   }
 
   async function handleGenerateAiImage(prompt: string) {
